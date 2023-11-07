@@ -1,25 +1,36 @@
 import os
-
+import asyncio
 import discord
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 load_dotenv()
 
+TOKEN = os.environ['DISCORD_TOKEN']
+PREFIX = os.environ['COMMAND_PREFIX']
+
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-@client.event
+
+@bot.event
 async def on_ready():
-    print(f'We have logged in as {client.user}')
+    print(f'Logged in as {bot.user}')
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
 
-    if message.content.startswith('$hello'):
-        await message.channel.send('Hello!')
+async def load_extensions():
+    for filename in os.listdir("discordbot/cogs"):
+        if filename.endswith(".py"):
+            await bot.load_extension(f"cogs.{filename[:-3]}")
 
-client.run(os.environ['DISCORD_TOKEN'])
+
+async def main():
+    async with bot:
+        await load_extensions()
+        await bot.start(TOKEN)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
