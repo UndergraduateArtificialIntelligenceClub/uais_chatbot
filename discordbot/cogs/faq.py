@@ -10,6 +10,10 @@ class Faq(commands.Cog):
     async def hello(self, ctx):
         await ctx.send(content='hi')
 
+    @commands.command(brief='Sends the website of the UAIS', aliases=['site'])
+    async def website(self, ctx):
+        await ctx.send(content='https://uais.dev/')
+
 
 async def setup(bot):
   await bot.add_cog(Faq(bot))
