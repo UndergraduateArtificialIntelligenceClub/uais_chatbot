@@ -20,10 +20,10 @@ async def on_ready():
     print(f'Logged in as {bot.user}')
 
 
+# Comment out cogs you do not need during development
 async def load_extensions():
-    for filename in os.listdir("discordbot/cogs"):
-        if filename.endswith(".py"):
-            await bot.load_extension(f"cogs.{filename[:-3]}")
+    await bot.load_extension(f"cogs.faq")
+    # await bot.load_extension(f"cogs.googlecalendar")
 
 
 async def main():
