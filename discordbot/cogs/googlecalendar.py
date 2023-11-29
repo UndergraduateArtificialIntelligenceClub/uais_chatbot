@@ -8,7 +8,7 @@ from googleapiclient.errors import HttpError
 from discord.ext import commands
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 class Calendar(commands.Cog):
@@ -66,7 +66,8 @@ class Calendar(commands.Cog):
             # Sends the start and name of the next 10 events
             payload = ""
             for event in events:
-                start = event["start"].get("dateTime", event["start"].get("date"))
+                start = event["start"].get(
+                    "dateTime", event["start"].get("date"))
                 payload += f"{start} {event['summary']}\n"
 
             await ctx.send(content=payload)
@@ -74,6 +75,11 @@ class Calendar(commands.Cog):
         except HttpError as error:
             await ctx.send(content=f"An error occured: {error}")
 
+    @commands.command(brief='Opens event creation menu')
+    async def plan(self, ctx):
+        # TODO:implement
+        await ctx.send(content="Foo")
+
 
 async def setup(bot):
-  await bot.add_cog(Calendar(bot))
+    await bot.add_cog(Calendar(bot))
