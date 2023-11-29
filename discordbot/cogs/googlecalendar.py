@@ -1,5 +1,5 @@
-import datetime
 import os
+from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -16,8 +16,8 @@ class Calendar(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(brief='Lists 10 upcoming Google Calendar events', aliases=['calendar', 'ev'])
-    async def events(self, ctx):
+    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
+    async def events(self, ctx, events_num=10):
         creds = None
 
         # The file token.json stores the user's access and refresh tokens, and is
@@ -43,7 +43,7 @@ class Calendar(commands.Cog):
             service = build("calendar", "v3", credentials=creds)
 
             # Call the Calendar API
-            now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+            now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
 
             # print("Getting the upcoming 10 events")
             events_result = (
@@ -51,7 +51,7 @@ class Calendar(commands.Cog):
                 .list(
                     calendarId="primary",
                     timeMin=now,
-                    maxResults=10,
+                    maxResults=events_num,
                     singleEvents=True,
                     orderBy="startTime",
                 )
@@ -66,9 +66,13 @@ class Calendar(commands.Cog):
             # Sends the start and name of the next 10 events
             payload = ""
             for event in events:
-                start = event["start"].get(
-                    "dateTime", event["start"].get("date"))
-                payload += f"{start} {event['summary']}\n"
+                # Get event start time
+                start = event["start"].get("dateTime", event["start"].get("date"))
+                # Convert to human readable format
+                start_dt = datetime.fromisoformat(start)
+                formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p")
+
+                payload += f"**{formatted_start}:** {event['summary']}\n"
 
             await ctx.send(content=payload)
 
@@ -79,6 +83,11 @@ class Calendar(commands.Cog):
     async def plan(self, ctx):
         # TODO:implement
         await ctx.send(content="Foo")
+
+    @commands.command(brief='Plans an event from one text command call')
+    async def plancli(self, ctx):
+        # TODO:implement
+        await ctx.send(content="Bar")
 
 
 async def setup(bot):
