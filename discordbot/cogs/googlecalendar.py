@@ -18,6 +18,10 @@ class Calendar(commands.Cog):
 
     @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
     async def events(self, ctx, events_num=10):
+        if (not isinstance(events_num, int)) or (events_num < 1) or (events_num > 30):
+            await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
+            return
+
         creds = None
 
         # The file token.json stores the user's access and refresh tokens, and is
@@ -63,14 +67,14 @@ class Calendar(commands.Cog):
                 await ctx.send(content="No upcoming events found.")
                 return
 
-            # Sends the start and name of the next 10 events
+            # Sends the start and name of the next events_num events
             payload = ""
             for event in events:
                 # Get event start time
                 start = event["start"].get("dateTime", event["start"].get("date"))
                 # Convert to human readable format
                 start_dt = datetime.fromisoformat(start)
-                formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p")
+                formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
                 payload += f"**{formatted_start}:** {event['summary']}\n"
 
@@ -79,12 +83,12 @@ class Calendar(commands.Cog):
         except HttpError as error:
             await ctx.send(content=f"An error occured: {error}")
 
-    @commands.command(brief='Opens event creation menu')
+    @commands.command(brief='Opens event creation menu', aliases=['pl'])
     async def plan(self, ctx):
         # TODO:implement
         await ctx.send(content="Foo")
 
-    @commands.command(brief='Plans an event from one text command call')
+    @commands.command(brief='Plans an event from one text command call', aliases=['plc', 'planc', 'plcli'])
     async def plancli(self, ctx):
         # TODO:implement
         await ctx.send(content="Bar")
