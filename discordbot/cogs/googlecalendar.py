@@ -16,14 +16,7 @@ class Calendar(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
-    async def events(self, ctx, events_num=10):
-        if (not isinstance(events_num, int)) or (events_num < 1) or (events_num > 30):
-            await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
-            return
-
         creds = None
-
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first time.
         if os.path.exists("token.json"):
@@ -44,14 +37,23 @@ class Calendar(commands.Cog):
                 token.write(creds.to_json())
 
         try:
-            service = build("calendar", "v3", credentials=creds)
+            self.service = build("calendar", "v3", credentials=creds)
+        except HttpError as error:
+            print(f"Google calendar initialization failed: {error}")
 
-            # Call the Calendar API
+    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
+    async def events(self, ctx, events_num=10):
+        if (not isinstance(events_num, int)) or (events_num < 1) or (events_num > 30):
+            await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
+            return
+
+        try:
+           # Call the Calendar API
             now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
 
             # print("Getting the upcoming 10 events")
             events_result = (
-                service.events()
+                self.service.events()
                 .list(
                     calendarId="primary",
                     timeMin=now,
@@ -71,10 +73,12 @@ class Calendar(commands.Cog):
             payload = ""
             for event in events:
                 # Get event start time
-                start = event["start"].get("dateTime", event["start"].get("date"))
+                start = event["start"].get(
+                    "dateTime", event["start"].get("date"))
                 # Convert to human readable format
                 start_dt = datetime.fromisoformat(start)
-                formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+                formatted_start = start_dt.strftime(
+                    "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
                 payload += f"**{formatted_start}:** {event['summary']}\n"
 
@@ -90,8 +94,29 @@ class Calendar(commands.Cog):
 
     @commands.command(brief='Plans an event from one text command call', aliases=['plc', 'planc', 'plcli'])
     async def plancli(self, ctx):
-        # TODO:implement
-        await ctx.send(content="Bar")
+        event = {
+            'summary': 'Test event',
+            'location': 'University of Alberta',
+            'description': 'Description',
+            'start': {
+                'dateTime': '2023-12-20T09:00:00-07:00',
+                'timeZone': 'America/Los_Angeles',
+            },
+            'end': {
+                'dateTime': '2023-12-21T17:00:00-07:00',
+                'timeZone': 'America/Los_Angeles',
+            },
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'email', 'minutes': 24 * 60},
+                    {'method': 'popup', 'minutes': 10},
+                ],
+            },
+        }
+
+        event = self.service.events().insert(calendarId='primary', body=event).execute()
+        await ctx.send(content=f"Event created: {event.get('htmlLink')}")
 
 
 async def setup(bot):
