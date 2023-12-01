@@ -9,9 +9,11 @@ class AuditLog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name='printlogs')
+    @commands.command(name='printlogs', aliases=['PrintLogs'])
     @commands.has_permissions(administrator=True)
     async def print_logs(self, ctx, user: discord.User, limit: int = 10):
+        # call with !printlogs @Username <Limit>
+        # Example: !printlogs @John 5
         try:
             # Fetch the audit logs for the server
             logs = []
