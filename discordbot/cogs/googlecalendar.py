@@ -92,19 +92,28 @@ class Calendar(commands.Cog):
         # TODO:implement
         await ctx.send(content="Foo")
 
-    @commands.command(brief='Plans an event from one text command call', aliases=['plc', 'planc', 'plcli'])
-    async def plancli(self, ctx):
+    @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
+    async def plancli(self, ctx, payload=""):
+        if not payload:
+            await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00-07:00,2023-12-21T17:00:00-07:00")
+            return
+
+        arguments = payload.split(sep=',') 
+        if len(arguments) != 5:
+            await ctx.send(content="Invalid number of arguments. Call !plancli without arguments to see proper format example")
+            return
+
         event = {
-            'summary': 'Test event',
-            'location': 'University of Alberta',
-            'description': 'Description',
+            'summary': arguments[0],
+            'location': arguments[1],
+            'description': arguments[2],
             'start': {
-                'dateTime': '2023-12-20T09:00:00-07:00',
-                'timeZone': 'America/Los_Angeles',
+                'dateTime': arguments[3],
+                'timeZone': 'America/Edmonton',
             },
             'end': {
-                'dateTime': '2023-12-21T17:00:00-07:00',
-                'timeZone': 'America/Los_Angeles',
+                'dateTime': arguments[4], 
+                'timeZone': 'America/Edmonton',
             },
             'reminders': {
                 'useDefault': False,
