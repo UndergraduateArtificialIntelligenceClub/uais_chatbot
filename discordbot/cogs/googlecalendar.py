@@ -7,6 +7,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from discord.ext import commands
+from dotenv import load_dotenv
+
+load_dotenv()
+TIMEZONE = os.environ['TIMEZONE']
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
@@ -40,6 +44,7 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
 
 
 class EventCreationView(discord.ui.View):
+
     def __init__(self):
         super().__init__(timeout=3600)
         self.event_title = None
@@ -174,11 +179,11 @@ class Calendar(commands.Cog):
             'description': arguments[2],
             'start': {
                 'dateTime': arguments[3],
-                'timeZone': 'America/Edmonton',
+                'timeZone': TIMEZONE, 
             },
             'end': {
                 'dateTime': arguments[4],
-                'timeZone': 'America/Edmonton',
+                'timeZone': TIMEZONE, 
             },
             'reminders': {
                 'useDefault': False,
