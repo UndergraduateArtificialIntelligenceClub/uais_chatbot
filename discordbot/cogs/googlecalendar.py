@@ -1,5 +1,7 @@
 import os
+import discord
 from datetime import datetime
+from discord.interactions import Interaction
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -9,6 +11,46 @@ from discord.ext import commands
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+
+class EventNamingModal(discord.ui.Modal, title="Name The Event"):
+
+    event_title = discord.ui.TextInput(
+        style=discord.TextStyle.short,
+        label="Title",
+        required=True,
+        placeholder="Event Summary"
+    )
+
+    event_description = discord.ui.TextInput(
+        style=discord.TextStyle.long,
+        label="Description",
+        required=False,
+        placeholder="Event Description (optional)"
+    )
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message("Title and Description Saved", ephemeral=True)
+
+
+class EventCreationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=3600)
+        self.value = None
+
+    @discord.ui.button(label="Set Title", emoji="💬", style=discord.ButtonStyle.primary)
+    async def submit_title(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # On click, create the textbox and send it to the user
+        modal = EventNamingModal()
+        await interaction.response.send_modal(modal)
+        # Wait until user submits info
+        await modal.wait() 
+        event_title = modal.event_title
+        event_description = modal.event_description
+        # Disable the button and make it gray
+        button.disabled = True
+        button.style = discord.ButtonStyle.gray
+        await interaction.edit_original_response(view=self)
 
 
 class Calendar(commands.Cog):
@@ -51,7 +93,7 @@ class Calendar(commands.Cog):
            # Call the Calendar API
             now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
 
-            # print("Getting the upcoming 10 events")
+            # print("Getting the upcoming events_num events")
             events_result = (
                 self.service.events()
                 .list(
@@ -90,15 +132,18 @@ class Calendar(commands.Cog):
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     async def plan(self, ctx):
         # TODO:implement
-        await ctx.send(content="Foo")
+        event_creation_view = EventCreationView()
+        await ctx.send(content="Event creation menu:", view=event_creation_view)
+        await event_creation_view.wait()
+        await ctx.send(content="View Submitted (final)")
 
     @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
-    async def plancli(self, ctx, payload=""):
+    async def plancli(self, ctx, *, payload=""):
         if not payload:
             await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00-07:00,2023-12-21T17:00:00-07:00")
             return
 
-        arguments = payload.split(sep=',') 
+        arguments = payload.split(',')
         if len(arguments) != 5:
             await ctx.send(content="Invalid number of arguments. Call !plancli without arguments to see proper format example")
             return
@@ -112,7 +157,7 @@ class Calendar(commands.Cog):
                 'timeZone': 'America/Edmonton',
             },
             'end': {
-                'dateTime': arguments[4], 
+                'dateTime': arguments[4],
                 'timeZone': 'America/Edmonton',
             },
             'reminders': {
@@ -124,7 +169,12 @@ class Calendar(commands.Cog):
             },
         }
 
-        event = self.service.events().insert(calendarId='primary', body=event).execute()
+        try:
+            event = self.service.events().insert(calendarId='primary', body=event).execute()
+        except HttpError as error:
+            await ctx.send(content=f"An error occured: {error}")
+            return
+
         await ctx.send(content=f"Event created: {event.get('htmlLink')}")
 
 
