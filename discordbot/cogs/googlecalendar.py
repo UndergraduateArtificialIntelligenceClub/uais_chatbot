@@ -1,7 +1,6 @@
 import os
 import discord
 from datetime import datetime
-from discord.interactions import Interaction
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -29,28 +28,49 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
         placeholder="Event Description (optional)"
     )
 
+    event_location = discord.ui.TextInput(
+        style=discord.TextStyle.short,
+        label="Location",
+        required=False,
+        placeholder="Event Location (optional)"
+    )
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message("Title and Description Saved", ephemeral=True)
+        await interaction.response.edit_message(content="**Event creation menu:**  (Title and Description saved)")
 
 
 class EventCreationView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=3600)
-        self.value = None
+        self.event_title = None
+        self.event_description = None
+        self.event_location = None
 
-    @discord.ui.button(label="Set Title", emoji="💬", style=discord.ButtonStyle.primary)
-    async def submit_title(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
+    async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the textbox and send it to the user
         modal = EventNamingModal()
         await interaction.response.send_modal(modal)
         # Wait until user submits info
-        await modal.wait() 
-        event_title = modal.event_title
-        event_description = modal.event_description
-        # Disable the button and make it gray
-        button.disabled = True
+        await modal.wait()
+        self.event_title = modal.event_title
+        self.event_description = modal.event_description
+        self.event_location = modal.event_location
+        # Make it gray (clicked)
         button.style = discord.ButtonStyle.gray
         await interaction.edit_original_response(view=self)
+
+    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
+    async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+    @discord.ui.button(label="Set Time", emoji="🕒", style=discord.ButtonStyle.primary)
+    async def set_time(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+    @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
+    async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
 
 
 class Calendar(commands.Cog):
@@ -133,7 +153,7 @@ class Calendar(commands.Cog):
     async def plan(self, ctx):
         # TODO:implement
         event_creation_view = EventCreationView()
-        await ctx.send(content="Event creation menu:", view=event_creation_view)
+        await ctx.send(content="**Event creation menu:**", view=event_creation_view)
         await event_creation_view.wait()
         await ctx.send(content="View Submitted (final)")
 
