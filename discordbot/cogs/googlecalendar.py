@@ -18,7 +18,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 class EventNamingModal(discord.ui.Modal, title="Name The Event"):
 
-    event_title = discord.ui.TextInput(
+    event_summary = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Title",
         required=True,
@@ -86,7 +86,7 @@ class EventCreationView(discord.ui.View):
 
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # On click, create the textbox and send it to the user
+        # On click, create the modal and send it to the user
         modal = EventNamingModal()
         await interaction.response.send_modal(modal)
         # Wait until user submits info
@@ -94,7 +94,7 @@ class EventCreationView(discord.ui.View):
         self.name_modal = modal
         # Make it gray (clicked)
         button.style = discord.ButtonStyle.gray
-        await interaction.edit_original_response(view=self)
+        await self.check_readiness(interaction)
 
     @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
     async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -103,7 +103,55 @@ class EventCreationView(discord.ui.View):
         await modal.wait()
         self.time_modal = modal
         button.style = discord.ButtonStyle.gray
-        await interaction.edit_original_response(view=self)
+        await self.check_readiness(interaction)
+
+    async def check_readiness(self, interaction: discord.Interaction):
+        name_modal, time_modal = self.name_modal, self.time_modal
+        # Submit button disabled by default
+        submit_button = self.children[2]
+        submit_button.disabled = True
+        submit_button.style=discord.ButtonStyle.grey
+
+        if time_modal:
+            error_payload = ""
+            day, month, year, time = time_modal.day.value, time_modal.month.value, time_modal.year.value, time_modal.time.value
+
+            if not self.is_valid_date(day, month, year):
+                error_payload += "**Error:** invalid day, month or year entered"
+            if not self.is_valid_time(time):
+                error_payload += "\n**Error:** invalid time entered"
+
+            if error_payload:
+                self.children[1].style = discord.ButtonStyle.danger
+                await interaction.edit_original_response(view=self, content=error_payload)
+                return
+
+        if not name_modal or not time_modal:
+            await interaction.edit_original_response(view=self)
+            return
+
+        # All checks passed, unlocking submit button
+        submit_button.disabled = False
+        submit_button.style=discord.ButtonStyle.green
+        await interaction.edit_original_response(view=self, content="**Ready to add event to calendar**")
+
+
+    def is_valid_date(self, day, month, year):
+        try:
+            datetime(int(year), int(month), int(day))
+            return True
+        except ValueError:
+            return False
+
+    def is_valid_time(self, time_str):
+        try:
+            if len(time_str.split(' ')) == 2:  # Assuming 12-hour format with AM/PM
+                datetime.strptime(time_str, "%I:%M %p")
+            else:  # Assuming 24-hour format
+                datetime.strptime(time_str, "%H:%M")
+            return True
+        except ValueError:
+            return False
 
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
