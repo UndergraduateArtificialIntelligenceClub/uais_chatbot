@@ -43,13 +43,46 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
         await interaction.response.edit_message(content="**Event creation menu:**  (Title and Description saved)")
 
 
+class EventDateModal(discord.ui.Modal, title="Set The Date"):
+
+    day = discord.ui.TextInput(
+        label="Enter day (1-31)",
+        default=datetime.now().day,
+        min_length=1,
+        max_length=2
+    )
+
+    month = discord.ui.TextInput(
+        label="Enter month (1-12 or name)",
+        default=datetime.now().month,
+        min_length=1,
+        max_length=15
+    )
+
+    year = discord.ui.TextInput(
+        label="Enter year",
+        default=datetime.now().year,
+        min_length=1,
+        max_length=15
+    )
+
+    time = discord.ui.TextInput(
+        label="Enter time (e.g. 14:00 or 2:00 PM)",
+        default=datetime.now().strftime("%I:%M %p").lstrip("0"),
+        min_length=1,
+        max_length=15
+    )
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.edit_message(content="**Event creation menu:**  (Date and Time saved)")
+
+
 class EventCreationView(discord.ui.View):
 
     def __init__(self):
         super().__init__(timeout=3600)
-        self.event_title = None
-        self.event_description = None
-        self.event_location = None
+        self.name_modal = None
+        self.time_modal = None
 
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -58,20 +91,19 @@ class EventCreationView(discord.ui.View):
         await interaction.response.send_modal(modal)
         # Wait until user submits info
         await modal.wait()
-        self.event_title = modal.event_title
-        self.event_description = modal.event_description
-        self.event_location = modal.event_location
+        self.name_modal = modal
         # Make it gray (clicked)
         button.style = discord.ButtonStyle.gray
         await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
     async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
-
-    @discord.ui.button(label="Set Time", emoji="🕒", style=discord.ButtonStyle.primary)
-    async def set_time(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
+        modal = EventDateModal()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        self.time_modal = modal
+        button.style = discord.ButtonStyle.gray
+        await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -179,11 +211,11 @@ class Calendar(commands.Cog):
             'description': arguments[2],
             'start': {
                 'dateTime': arguments[3],
-                'timeZone': TIMEZONE, 
+                'timeZone': TIMEZONE,
             },
             'end': {
                 'dateTime': arguments[4],
-                'timeZone': TIMEZONE, 
+                'timeZone': TIMEZONE,
             },
             'reminders': {
                 'useDefault': False,
