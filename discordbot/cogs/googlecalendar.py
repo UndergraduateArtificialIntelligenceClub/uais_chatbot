@@ -1,6 +1,6 @@
 import os
 import discord
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -18,21 +18,21 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 class EventNamingModal(discord.ui.Modal, title="Name The Event"):
 
-    event_summary = discord.ui.TextInput(
+    summary = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Title",
         required=True,
         placeholder="Event Summary"
     )
 
-    event_description = discord.ui.TextInput(
+    description = discord.ui.TextInput(
         style=discord.TextStyle.long,
         label="Description",
         required=False,
         placeholder="Event Description (optional)"
     )
 
-    event_location = discord.ui.TextInput(
+    location = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Location",
         required=False,
@@ -73,6 +73,13 @@ class EventDateModal(discord.ui.Modal, title="Set The Date"):
         max_length=15
     )
 
+    duration = discord.ui.TextInput(
+        label="Enter duration (e.g. 30m or 0.5h)",
+        default="60m",
+        min_length=1,
+        max_length=4
+    )
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.edit_message(content="**Event creation menu:**  (Date and Time saved)")
 
@@ -83,6 +90,7 @@ class EventCreationView(discord.ui.View):
         super().__init__(timeout=3600)
         self.name_modal = None
         self.time_modal = None
+        self.eventinfo = None
 
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -110,16 +118,19 @@ class EventCreationView(discord.ui.View):
         # Submit button disabled by default
         submit_button = self.children[2]
         submit_button.disabled = True
-        submit_button.style=discord.ButtonStyle.grey
+        submit_button.style = discord.ButtonStyle.grey
 
         if time_modal:
             error_payload = ""
-            day, month, year, time = time_modal.day.value, time_modal.month.value, time_modal.year.value, time_modal.time.value
+            day, month, year = time_modal.day.value, time_modal.month.value, time_modal.year.value
+            time, duration = time_modal.time.value, time_modal.duration.value
 
-            if not self.is_valid_date(day, month, year):
+            if not self.return_valid_date(day, month, year):
                 error_payload += "**Error:** invalid day, month or year entered"
-            if not self.is_valid_time(time):
+            if not self.return_valid_time(time):
                 error_payload += "\n**Error:** invalid time entered"
+            if not self.return_valid_duration(duration):
+                error_payload += "\n**Error:** invalid duration entered"
 
             if error_payload:
                 self.children[1].style = discord.ButtonStyle.danger
@@ -127,35 +138,68 @@ class EventCreationView(discord.ui.View):
                 return
 
         if not name_modal or not time_modal:
+            # Either the title or time modal not submitted, return
             await interaction.edit_original_response(view=self)
             return
 
         # All checks passed, unlocking submit button
         submit_button.disabled = False
-        submit_button.style=discord.ButtonStyle.green
+        submit_button.style = discord.ButtonStyle.green
         await interaction.edit_original_response(view=self, content="**Ready to add event to calendar**")
 
-
-    def is_valid_date(self, day, month, year):
+    def return_valid_date(self, day, month, year):
         try:
-            datetime(int(year), int(month), int(day))
-            return True
+            date = datetime(int(year), int(month), int(day))
+            return date
         except ValueError:
             return False
 
-    def is_valid_time(self, time_str):
+    def return_valid_time(self, time: str):
         try:
-            if len(time_str.split(' ')) == 2:  # Assuming 12-hour format with AM/PM
-                datetime.strptime(time_str, "%I:%M %p")
+            if len(time.split(' ')) == 2:  # Assuming 12-hour format with AM/PM
+                time = datetime.strptime(time, "%I:%M %p")
             else:  # Assuming 24-hour format
-                datetime.strptime(time_str, "%H:%M")
-            return True
+                time = datetime.strptime(time, "%H:%M")
+            return time
         except ValueError:
             return False
+
+    def return_valid_duration(self, duration: str):
+        try:
+            if 'm' in duration.lower():
+                duration_minutes = int(duration.replace('m', ''))
+            elif 'h' in duration.lower():
+                duration_hours = float(duration.replace('h', ''))
+                duration_minutes = int(duration_hours * 60)
+            else:
+                return False
+        except ValueError:
+            return False
+
+        return duration_minutes
 
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
+        name_modal, time_modal = self.name_modal, self.time_modal
+
+        day, month, year = time_modal.day.value, time_modal.month.value, time_modal.year.value
+        time, duration = time_modal.time.value, time_modal.duration.value
+        summary, description, location = name_modal.summary.value, name_modal.description.value, name_modal.location.value
+
+        start_time = self.return_valid_time(time).replace(
+            day=int(day), month=int(month), year=int(year))
+        duration_minutes = self.return_valid_duration(duration)
+        end_time = (start_time + timedelta(minutes=duration_minutes)
+                    ).replace(day=int(day), month=int(month), year=int(year))
+
+        # !plancli args: Summary,Location,Description,Start time,End time
+        self.eventinfo = [summary, location, description,
+                            start_time.isoformat(), end_time.isoformat()]
+
+        self.clear_items()
+        await interaction.response.defer()
+        await interaction.delete_original_response()
+        self.stop()
 
 
 class Calendar(commands.Cog):
@@ -240,12 +284,15 @@ class Calendar(commands.Cog):
         event_creation_view = EventCreationView()
         await ctx.send(content="**Event creation menu:**", view=event_creation_view)
         await event_creation_view.wait()
-        await ctx.send(content="View Submitted (final)")
+
+        event = event_creation_view.eventinfo
+        if event:
+            await self.plancli(ctx, payload=f"{event[0]},{event[1]},{event[2]},{event[3]},{event[4]}")
 
     @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
     async def plancli(self, ctx, *, payload=""):
         if not payload:
-            await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00-07:00,2023-12-21T17:00:00-07:00")
+            await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00,2023-12-21T17:00:00")
             return
 
         arguments = payload.split(',')
