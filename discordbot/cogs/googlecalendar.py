@@ -86,11 +86,15 @@ class EventDateModal(discord.ui.Modal, title="Set The Date"):
 
 class EventCreationView(discord.ui.View):
 
-    def __init__(self):
+    def __init__(self, user: discord.User):
         super().__init__(timeout=3600)
+        self.user = user
         self.name_modal = None
         self.date_modal = None
         self.eventinfo = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user == self.user
 
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -161,7 +165,8 @@ class EventCreationView(discord.ui.View):
             # Convert month name to number if necessary
             if isinstance(month, str) and not month.isdigit():
                 month = month.lower()
-                month = month_mapping.get(month, -1)  # Month not found = return -1, will cause ValueError in datetime
+                # Month not found = return -1, will cause ValueError in datetime
+                month = month_mapping.get(month, -1)
 
             # Create date object
             date = datetime(int(year), int(month), int(day))
@@ -213,14 +218,16 @@ class EventCreationView(discord.ui.View):
         start_time = self.return_valid_time(time)
 
         # Combine date and time for start_time
-        start_time = start_time.replace(year=start_date.year, month=start_date.month, day=start_date.day)
+        start_time = start_time.replace(
+            year=start_date.year, month=start_date.month, day=start_date.day)
 
         # Calculate duration and end_time
         duration_minutes = self.return_valid_duration(duration)
         end_time = start_time + timedelta(minutes=duration_minutes)
 
         # Prepare event information
-        self.eventinfo = [summary, location, description, start_time.isoformat(), end_time.isoformat()]
+        self.eventinfo = [summary, location, description,
+                          start_time.isoformat(), end_time.isoformat()]
 
         # Clear items, respond to interaction, and stop
         self.clear_items()
@@ -306,17 +313,21 @@ class Calendar(commands.Cog):
             await ctx.send(content=f"An error occured: {error}")
 
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
+    @commands.has_permissions(administrator=True)
     async def plan(self, ctx):
-        # TODO:implement
-        event_creation_view = EventCreationView()
+        # Send the event creation menu (view)
+        event_creation_view = EventCreationView(user=ctx.author)
         await ctx.send(content="**Event creation menu:**", view=event_creation_view)
+        # Wait until it finishes execution
         await event_creation_view.wait()
 
+        # Get event data
         event = event_creation_view.eventinfo
         if event:
             await self.plancli(ctx, payload=f"{event[0]},{event[1]},{event[2]},{event[3]},{event[4]}")
 
     @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
+    @commands.has_permissions(administrator=True)
     async def plancli(self, ctx, *, payload=""):
         if not payload:
             await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00,2023-12-21T17:00:00")
