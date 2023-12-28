@@ -29,7 +29,8 @@ class Calendar(commands.Cog):
         # Get event data
         event = event_creation_view.eventinfo
         if event:
-            await self.plancli(ctx, payload=f"{event[0]},{event[1]},{event[2]},{event[3]},{event[4]}")
+            payload = f"{event[0]},{event[1]},{event[2]},{event[3]},{event[4]}"
+            await ctx.send(content=self.google_calendar.create_event(payload))
 
     @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
     @commands.has_permissions(administrator=True)
