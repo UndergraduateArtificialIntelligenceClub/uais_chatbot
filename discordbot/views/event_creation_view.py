@@ -70,6 +70,54 @@ class EventDateModal(discord.ui.Modal, title="Set The Date"):
         await interaction.response.edit_message(content="**Event creation menu:**  (Date and Time saved)")
 
 
+def return_valid_date(day, month, year):
+    # Dictionary to map month names to numbers
+    month_mapping = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+        'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+    }
+
+    try:
+        # Convert month name to number if necessary
+        if isinstance(month, str) and not month.isdigit():
+            month = month.lower()
+            # Month not found = return -1, will cause ValueError in datetime
+            month = month_mapping.get(month, -1)
+
+        # Create date object
+        date = datetime(int(year), int(month), int(day))
+        return date
+
+    except ValueError:
+        return False
+
+
+def return_valid_time(time: str):
+    try:
+        if len(time.split(' ')) == 2:  # Assuming 12-hour format with AM/PM
+            time = datetime.strptime(time, "%I:%M %p")
+        else:  # Assuming 24-hour format
+            time = datetime.strptime(time, "%H:%M")
+        return time
+    except ValueError:
+        return False
+
+
+def return_valid_duration(duration: str):
+    try:
+        if 'm' in duration.lower():
+            duration_minutes = int(duration.replace('m', ''))
+        elif 'h' in duration.lower():
+            duration_hours = float(duration.replace('h', ''))
+            duration_minutes = int(duration_hours * 60)
+        else:
+            return False
+    except ValueError:
+        return False
+
+    return duration_minutes
+
+
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
@@ -118,11 +166,11 @@ class EventCreationView(discord.ui.View):
             day, month, year = date_modal.day.value, date_modal.month.value, date_modal.year.value
             time, duration = date_modal.time.value, date_modal.duration.value
 
-            if not self.return_valid_date(day, month, year):
+            if not return_valid_date(day, month, year):
                 error_payload += "**Error:** invalid day, month or year entered"
-            if not self.return_valid_time(time):
+            if not return_valid_time(time):
                 error_payload += "\n**Error:** invalid time entered"
-            if not self.return_valid_duration(duration):
+            if not return_valid_duration(duration):
                 error_payload += "\n**Error:** invalid duration entered"
 
             if error_payload:
@@ -140,51 +188,6 @@ class EventCreationView(discord.ui.View):
         submit_button.style = discord.ButtonStyle.green
         await interaction.edit_original_response(view=self, content="**Ready to add event to calendar**")
 
-    def return_valid_date(self, day, month, year):
-        # Dictionary to map month names to numbers
-        month_mapping = {
-            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
-            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
-        }
-
-        try:
-            # Convert month name to number if necessary
-            if isinstance(month, str) and not month.isdigit():
-                month = month.lower()
-                # Month not found = return -1, will cause ValueError in datetime
-                month = month_mapping.get(month, -1)
-
-            # Create date object
-            date = datetime(int(year), int(month), int(day))
-            return date
-
-        except ValueError:
-            return False
-
-    def return_valid_time(self, time: str):
-        try:
-            if len(time.split(' ')) == 2:  # Assuming 12-hour format with AM/PM
-                time = datetime.strptime(time, "%I:%M %p")
-            else:  # Assuming 24-hour format
-                time = datetime.strptime(time, "%H:%M")
-            return time
-        except ValueError:
-            return False
-
-    def return_valid_duration(self, duration: str):
-        try:
-            if 'm' in duration.lower():
-                duration_minutes = int(duration.replace('m', ''))
-            elif 'h' in duration.lower():
-                duration_hours = float(duration.replace('h', ''))
-                duration_minutes = int(duration_hours * 60)
-            else:
-                return False
-        except ValueError:
-            return False
-
-        return duration_minutes
-
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
         name_modal, date_modal = self.name_modal, self.date_modal
@@ -195,20 +198,20 @@ class EventCreationView(discord.ui.View):
         summary, description, location = name_modal.summary.value, name_modal.description.value, name_modal.location.value
 
         # Use return_valid_date to get the date
-        start_date = self.return_valid_date(day, month, year)
+        start_date = return_valid_date(day, month, year)
         if not start_date:
             print("Submit failed in googlecalendar.py, EventCreationView: invalid date")
             return
 
         # Use return_valid_time to parse the time (assuming this function exists)
-        start_time = self.return_valid_time(time)
+        start_time = return_valid_time(time)
 
         # Combine date and time for start_time
         start_time = start_time.replace(
             year=start_date.year, month=start_date.month, day=start_date.day)
 
         # Calculate duration and end_time
-        duration_minutes = self.return_valid_duration(duration)
+        duration_minutes = return_valid_duration(duration)
         end_time = start_time + timedelta(minutes=duration_minutes)
 
         # Prepare event information
