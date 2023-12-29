@@ -130,7 +130,7 @@ def return_valid_duration(duration: str):
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
-        super().__init__(timeout=3600)
+        super().__init__(timeout=1800)
         self.user = user
         self.event_data = {
             "summary": "",
@@ -188,7 +188,8 @@ class EventCreationView(discord.ui.View):
         event_data = self.event_data
         error_payload = ""
 
-        start_date = return_valid_date(event_data["day"], event_data["month"], event_data["year"])
+        start_date = return_valid_date(
+            event_data["day"], event_data["month"], event_data["year"])
         start_time = return_valid_time(event_data["time"])
         duration_minutes = return_valid_duration(event_data["duration"])
 
@@ -201,7 +202,8 @@ class EventCreationView(discord.ui.View):
 
         if not error_payload:
             # Combine date and time for start_time
-            start_time = start_time.replace(year=start_date.year, month=start_date.month, day=start_date.day)
+            start_time = start_time.replace(
+                year=start_date.year, month=start_date.month, day=start_date.day)
 
             # Calculate end time in respect to duration
             end_time = start_time + timedelta(minutes=duration_minutes)
