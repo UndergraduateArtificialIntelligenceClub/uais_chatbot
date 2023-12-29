@@ -90,7 +90,7 @@ class GoogleCalendarAPI:
 
         arguments = event_data.split(',')
         if len(arguments) != 5:
-            return "Invalid number of arguments. Call !plancli without arguments to see proper format example"
+            return None
 
         event = {
             'summary': arguments[0],
