@@ -3,6 +3,12 @@ from datetime import datetime, timedelta
 
 
 class EventNamingModal(discord.ui.Modal, title="Name The Event"):
+    def __init__(self, initial_summary="", initial_description="", initial_location=""):
+        super().__init__()
+        # Modals remember values
+        self.summary.default = initial_summary
+        self.description.default = initial_description
+        self.location.default = initial_location
 
     summary = discord.ui.TextInput(
         style=discord.TextStyle.short,
@@ -30,38 +36,41 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
 
 
 class EventDateModal(discord.ui.Modal, title="Set The Date"):
+    def __init__(self, initial_day="", initial_month="", initial_year="", initial_time="", initial_duration=""):
+        super().__init__()
+        # Modals remember values. If none are entered, default ones are shown
+        self.day.default = initial_day or str(datetime.now().day)
+        self.month.default = initial_month or datetime.now().strftime("%B")
+        self.year.default = initial_year or str(datetime.now().year)
+        self.time.default = initial_time or datetime.now().strftime("%I:%M %p").lstrip("0")
+        self.duration.default = initial_duration or "60m"
 
     day = discord.ui.TextInput(
         label="Enter day (1-31)",
-        default=datetime.now().day,
         min_length=1,
         max_length=2
     )
 
     month = discord.ui.TextInput(
         label="Enter month (1-12 or name)",
-        default=datetime.now().strftime("%B"),
         min_length=1,
         max_length=9
     )
 
     year = discord.ui.TextInput(
         label="Enter year",
-        default=datetime.now().year,
         min_length=1,
         max_length=15
     )
 
     time = discord.ui.TextInput(
         label="Enter time (e.g. 14:00 or 2:00 PM)",
-        default=datetime.now().strftime("%I:%M %p").lstrip("0"),
         min_length=1,
         max_length=15
     )
 
     duration = discord.ui.TextInput(
         label="Enter duration (e.g. 30m or 0.5h)",
-        default="60m",
         min_length=1,
         max_length=4
     )
@@ -125,6 +134,16 @@ class EventCreationView(discord.ui.View):
         self.user = user
         self.name_modal = None
         self.date_modal = None
+        self.event_data = {
+            "summary": "",
+            "description": "",
+            "location": "",
+            "day": "",
+            "month": "",
+            "year": "",
+            "time": "",
+            "duration": ""
+        }
         self.eventinfo = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -173,11 +192,20 @@ class EventCreationView(discord.ui.View):
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
-        modal = EventNamingModal()
-        await interaction.response.send_modal(modal)
+        modal = EventNamingModal(
+            initial_summary=self.event_data["summary"],
+            initial_description=self.event_data["description"],
+            initial_location=self.event_data["location"]
+        )
 
-        # Wait until user submits info
+        await interaction.response.send_modal(modal)
         await modal.wait()
+
+        self.event_data.update({
+            "summary": modal.summary.value,
+            "description": modal.description.value,
+            "location": modal.location.value
+        })
         self.name_modal = modal
 
         # Make it gray (clicked)
@@ -187,11 +215,24 @@ class EventCreationView(discord.ui.View):
     @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
     async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
-        modal = EventDateModal()
-        await interaction.response.send_modal(modal)
+        modal = EventDateModal(
+            initial_day=self.event_data["day"],
+            initial_month=self.event_data["month"],
+            initial_year=self.event_data["year"],
+            initial_time=self.event_data["time"],
+            initial_duration=self.event_data["duration"]
+        )
 
-        # Wait until user submits info
+        await interaction.response.send_modal(modal)
         await modal.wait()
+
+        self.event_data.update({
+            "day": modal.day.value,
+            "month": modal.month.value,
+            "year": modal.year.value,
+            "time": modal.time.value,
+            "duration": modal.duration.value
+        })
         self.date_modal = modal
 
         # Make it gray (clicked)
@@ -213,7 +254,7 @@ class EventCreationView(discord.ui.View):
             print("Submit failed in googlecalendar.py, EventCreationView: invalid date")
             return
 
-        # Use return_valid_time to parse the time (assuming this function exists)
+        # Use return_valid_time to parse the time
         start_time = return_valid_time(time)
 
         # Combine date and time for start_time
