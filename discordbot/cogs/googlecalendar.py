@@ -8,6 +8,7 @@ class Calendar(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.google_calendar = GoogleCalendarAPI()
+        self.active_menus = set()
 
     @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
     async def events(self, ctx, events_num=10):
@@ -20,14 +21,25 @@ class Calendar(commands.Cog):
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     @commands.has_permissions(administrator=True)
     async def plan(self, ctx):
+        # Check if the user already has an active menu
+        if ctx.author.id in self.active_menus:
+            await ctx.send("You already have an active event creation menu.")
+            return
+
         # Send the event creation menu (view)
         event_creation_view = EventCreationView(user=ctx.author)
         msg = await ctx.send(content="**Event creation menu:**", view=event_creation_view)
 
+        # Add the user to the set of active menus
+        self.active_menus.add(ctx.author.id)
+
         # Wait until it finishes execution and notify user if it times out
         if await event_creation_view.wait():
             await msg.edit(content="Event creation menu timed out.", view=None)
+            self.active_menus.discard(ctx.author.id)
             return
+
+        self.active_menus.discard(ctx.author.id)
 
         # Get event data
         event_data = event_creation_view.event_data
