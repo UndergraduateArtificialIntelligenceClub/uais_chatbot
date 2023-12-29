@@ -124,7 +124,7 @@ def return_valid_duration(duration: str):
     except ValueError:
         return False
 
-    return duration_minutes
+    return duration_minutes if duration_minutes > 0 else False
 
 
 class EventCreationView(discord.ui.View):
