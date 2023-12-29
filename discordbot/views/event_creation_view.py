@@ -132,8 +132,6 @@ class EventCreationView(discord.ui.View):
     def __init__(self, user: discord.User):
         super().__init__(timeout=3600)
         self.user = user
-        self.name_modal = None
-        self.date_modal = None
         self.event_data = {
             "summary": "",
             "description": "",
@@ -142,9 +140,12 @@ class EventCreationView(discord.ui.View):
             "month": "",
             "year": "",
             "time": "",
-            "duration": ""
+            "duration": "",
+            "start_time": "",
+            "end_time": ""
         }
-        self.eventinfo = None
+        self.name_modal_submitted = False
+        self.date_modal_submitted = False
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """
@@ -156,31 +157,21 @@ class EventCreationView(discord.ui.View):
         """
         Makes the submit button clickable if all conditions are met
         """
-        name_modal, date_modal = self.name_modal, self.date_modal
         # Submit button disabled by default
         submit_button = self.children[2]
         submit_button.disabled = True
         submit_button.style = discord.ButtonStyle.grey
 
-        if date_modal:
-            error_payload = ""
-            day, month, year = date_modal.day.value, date_modal.month.value, date_modal.year.value
-            time, duration = date_modal.time.value, date_modal.duration.value
-
-            if not return_valid_date(day, month, year):
-                error_payload += "**Error:** invalid day, month or year entered"
-            if not return_valid_time(time):
-                error_payload += "\n**Error:** invalid time entered"
-            if not return_valid_duration(duration):
-                error_payload += "\n**Error:** invalid duration entered"
+        if self.date_modal_submitted:
+            error_payload = self.validate_date_modal()
 
             if error_payload:
                 self.children[1].style = discord.ButtonStyle.danger
                 await interaction.edit_original_response(view=self, content=error_payload)
                 return
 
-        if not name_modal or not date_modal:
-            # Either the title or time modal not submitted, return
+        if not self.date_modal_submitted or not self.name_modal_submitted:
+            # Not all required data filled out, return
             await interaction.edit_original_response(view=self)
             return
 
@@ -188,6 +179,38 @@ class EventCreationView(discord.ui.View):
         submit_button.disabled = False
         submit_button.style = discord.ButtonStyle.green
         await interaction.edit_original_response(view=self, content="**Ready to add event to calendar**")
+
+    def validate_date_modal(self):
+        """
+        If date modal has correct values, returns nothing and calculates start_time and end_time
+        If incorrect value is encountered, returns a string specifying where
+        """
+        event_data = self.event_data
+        error_payload = ""
+
+        start_date = return_valid_date(event_data["day"], event_data["month"], event_data["year"])
+        start_time = return_valid_time(event_data["time"])
+        duration_minutes = return_valid_duration(event_data["duration"])
+
+        if not start_date:
+            error_payload += "**Error:** invalid day, month or year entered"
+        if not start_time:
+            error_payload += "\n**Error:** invalid time entered"
+        if not duration_minutes:
+            error_payload += "\n**Error:** invalid duration entered"
+
+        if not error_payload:
+            # Combine date and time for start_time
+            start_time = start_time.replace(year=start_date.year, month=start_date.month, day=start_date.day)
+
+            # Calculate end time in respect to duration
+            end_time = start_time + timedelta(minutes=duration_minutes)
+
+            # Prepare event information
+            self.event_data["start_time"] = start_time.isoformat()
+            self.event_data["end_time"] = end_time.isoformat()
+
+        return error_payload
 
     @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -206,9 +229,9 @@ class EventCreationView(discord.ui.View):
             "description": modal.description.value,
             "location": modal.location.value
         })
-        self.name_modal = modal
+        self.name_modal_submitted = True
 
-        # Make it gray (clicked)
+        # Make the button gray (clicked)
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
@@ -233,42 +256,14 @@ class EventCreationView(discord.ui.View):
             "time": modal.time.value,
             "duration": modal.duration.value
         })
-        self.date_modal = modal
+        self.date_modal_submitted = True
 
-        # Make it gray (clicked)
+        # Make the button gray (clicked)
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        name_modal, date_modal = self.name_modal, self.date_modal
-
-        # Extract values from modals
-        day, month, year = date_modal.day.value, date_modal.month.value, date_modal.year.value
-        time, duration = date_modal.time.value, date_modal.duration.value
-        summary, description, location = name_modal.summary.value, name_modal.description.value, name_modal.location.value
-
-        # Use return_valid_date to get the date
-        start_date = return_valid_date(day, month, year)
-        if not start_date:
-            print("Submit failed in googlecalendar.py, EventCreationView: invalid date")
-            return
-
-        # Use return_valid_time to parse the time
-        start_time = return_valid_time(time)
-
-        # Combine date and time for start_time
-        start_time = start_time.replace(
-            year=start_date.year, month=start_date.month, day=start_date.day)
-
-        # Calculate duration and end_time
-        duration_minutes = return_valid_duration(duration)
-        end_time = start_time + timedelta(minutes=duration_minutes)
-
-        # Prepare event information
-        self.eventinfo = [summary, location, description,
-                          start_time.isoformat(), end_time.isoformat()]
-
         # Clear items, respond to interaction, and stop
         self.clear_items()
         await interaction.response.defer()
