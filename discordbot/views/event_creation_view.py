@@ -128,33 +128,15 @@ class EventCreationView(discord.ui.View):
         self.eventinfo = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """
+        Only the user passed to constructor can use this view
+        """
         return interaction.user == self.user
 
-    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
-    async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # On click, create the modal and send it to the user
-        modal = EventNamingModal()
-        await interaction.response.send_modal(modal)
-        # Wait until user submits info
-        await modal.wait()
-        self.name_modal = modal
-        # Make it gray (clicked)
-        button.style = discord.ButtonStyle.gray
-        await self.check_readiness(interaction)
-
-    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
-    async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # On click, create the modal and send it to the user
-        modal = EventDateModal()
-        await interaction.response.send_modal(modal)
-        # Wait until user submits info
-        await modal.wait()
-        self.date_modal = modal
-        # Make it gray (clicked)
-        button.style = discord.ButtonStyle.gray
-        await self.check_readiness(interaction)
-
     async def check_readiness(self, interaction: discord.Interaction):
+        """
+        Makes the submit button clickable if all conditions are met
+        """
         name_modal, date_modal = self.name_modal, self.date_modal
         # Submit button disabled by default
         submit_button = self.children[2]
@@ -187,6 +169,34 @@ class EventCreationView(discord.ui.View):
         submit_button.disabled = False
         submit_button.style = discord.ButtonStyle.green
         await interaction.edit_original_response(view=self, content="**Ready to add event to calendar**")
+
+    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
+    async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # On click, create the modal and send it to the user
+        modal = EventNamingModal()
+        await interaction.response.send_modal(modal)
+
+        # Wait until user submits info
+        await modal.wait()
+        self.name_modal = modal
+
+        # Make it gray (clicked)
+        button.style = discord.ButtonStyle.gray
+        await self.check_readiness(interaction)
+
+    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
+    async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # On click, create the modal and send it to the user
+        modal = EventDateModal()
+        await interaction.response.send_modal(modal)
+
+        # Wait until user submits info
+        await modal.wait()
+        self.date_modal = modal
+
+        # Make it gray (clicked)
+        button.style = discord.ButtonStyle.gray
+        await self.check_readiness(interaction)
 
     @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
