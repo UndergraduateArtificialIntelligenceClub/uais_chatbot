@@ -22,9 +22,12 @@ class Calendar(commands.Cog):
     async def plan(self, ctx):
         # Send the event creation menu (view)
         event_creation_view = EventCreationView(user=ctx.author)
-        await ctx.send(content="**Event creation menu:**", view=event_creation_view)
-        # Wait until it finishes execution
-        await event_creation_view.wait()
+        msg = await ctx.send(content="**Event creation menu:**", view=event_creation_view)
+
+        # Wait until it finishes execution and notify user if it times out
+        if await event_creation_view.wait():
+            await msg.edit(content="Event creation menu timed out.", view=None)
+            return
 
         # Get event data
         event = event_creation_view.eventinfo
