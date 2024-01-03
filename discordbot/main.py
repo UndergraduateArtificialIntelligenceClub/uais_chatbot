@@ -11,6 +11,10 @@ PREFIX = os.environ['COMMAND_PREFIX']
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
+intents.messages = True
+intents.reactions = True
+intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
