@@ -43,8 +43,8 @@ class Calendar(commands.Cog):
 
         # Get event data
         event_data = event_creation_view.event_data
-        event_list = [event_data["summary"], event_data["location"],
-                      event_data["description"], event_data["start_time"], event_data["end_time"]]
+        event_list = [event_data.get("summary"), event_data.get("location"),
+                      event_data.get("description"), event_data.get("start_time"), event_data.get("end_time")]
 
         payload = ",".join(event_list)
         await ctx.send(content=self.google_calendar.create_event(payload))
