@@ -69,9 +69,9 @@ class AuditLog(commands.Cog):
         elif isinstance(target, discord.StageChannel):
             return f'Stage Channel: {target.name}'
         elif isinstance(target, discord.Emoji):
-            return f'Emoji: {target.name}'
+            return str(target)
         elif isinstance(target, discord.Sticker):
-            return f'Sticker: {target.name}'
+            return f"Sticker: {target.name} (URL: {target.url})"
         elif isinstance(target, discord.Invite):
             return f'Invite: {target.url}'
         elif isinstance(target, discord.ScheduledEvent):
