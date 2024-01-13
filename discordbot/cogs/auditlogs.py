@@ -40,8 +40,8 @@ class AuditLog(commands.Cog):
 
         except discord.Forbidden:
             await ctx.send("I don't have permission to access the audit logs.")
-        except Exception:
-            await ctx.send("Something went horribly wrong")
+        except Exception as e:
+            await ctx.send(f"Unexpected Error: {type(e).__name__}")
             
     def _format_action(self, action):
     # Extract the name of the action from AuditLogAction
@@ -80,9 +80,11 @@ class AuditLog(commands.Cog):
         elif isinstance(target, discord.PermissionOverwrite):
             return f'Permission Overwrite: {target.id}'
         else:
-            target_id = getattr(target, 'id', 'Unknown ID')
-            target_type = type(target).__name__
-            return f'Object: {target_type} (ID: {target_id})'
+            return f'Unknown or Deleted Object'
+        #else:
+         #   target_id = getattr(target, 'id', 'Unknown ID')
+         #   target_type = type(target).__name__
+         #   return f'Object: {target_type} (ID: {target_id})'
     
     async def cog_command_error(self, ctx, error):
         # Check if the error is due to missing required role/permissions
