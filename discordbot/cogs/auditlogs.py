@@ -15,7 +15,7 @@ class AuditLog(commands.Cog):
 
     @commands.command(name='auditlogs', aliases=['AuditLogs'])
     @commands.check(is_admin_or_executive_check)
-    async def print_logs(self, ctx, user: discord.User = None, limit: int = 10):
+    async def auditlogs(self, ctx, user: discord.User = None, limit: int = 10):
         # call with !auditlogs @Username <Number of logs to print>
         # Example: !auditlogs @John 5
         if user is None:
