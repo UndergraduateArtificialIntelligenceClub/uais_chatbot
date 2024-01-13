@@ -1,10 +1,6 @@
 import discord
 from discord.ext import commands
 
-intents = discord.Intents.default()
-intents.guilds = True
-intents.messages = True
-
 class AuditLog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -17,13 +13,13 @@ class AuditLog(commands.Cog):
         # Check if the user has the 'executive' role
         return any(role.name.lower() == 'executive' for role in ctx.author.roles)
 
-    @commands.command(name='printlogs', aliases=['PrintLogs'])
+    @commands.command(name='auditlogs', aliases=['AuditLogs'])
     @commands.check(is_admin_or_executive_check)
     async def print_logs(self, ctx, user: discord.User = None, limit: int = 10):
-        # call with !printlogs @Username <Number of logs to print>
-        # Example: !printlogs @John 5
+        # call with !auditlogs @Username <Number of logs to print>
+        # Example: !auditlogs @John 5
         if user is None:
-            await ctx.send("Usage: `!printlogs @Username [Num Logs to Print]`\nExample: `!printlogs @John 5`")
+            await ctx.send("Usage: `!auditlogs @Username [Num Logs to Print]`\nExample: `!auditlogs @John 5`")
             return
         try:
             # Fetch the audit logs for the server
