@@ -26,6 +26,10 @@ async def load_extensions():
     await bot.load_extension(f"cogs.auditlogs")
     # await bot.load_extension(f"cogs.googlecalendar")
 
+async def reload(ctx):
+    # Reloads the file, thus updating the Cog class.
+    bot.reload_extension("cogs.tracking")
+
 
 async def main():
     async with bot:
