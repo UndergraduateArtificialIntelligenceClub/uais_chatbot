@@ -20,15 +20,19 @@ async def on_ready():
     print(f'Logged in as {bot.user}')
 
 
-async def load_extensions():
+async def load_extension():
     for filename in os.listdir("discordbot/cogs"):
         if filename.endswith(".py"):
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
+async def reload(ctx):
+    # Reloads the file, thus updating the Cog class.
+    bot.reload_extension("cogs.tracking")
+
 
 async def main():
     async with bot:
-        await load_extensions()
+        await load_extension()
         await bot.start(TOKEN)
 
 
