@@ -55,7 +55,7 @@ class Channels(commands.Cog):
             await ctx.send("Would you like to customize the voice and text channel names? y/n? (Default names would be applied otherwise)")
             default = True
             try:
-                customcheck = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout= 30)
+                customcheck = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout= 60)
                 if customcheck.content.upper() == 'Y':
                     default = False
             except asyncio.TimeoutError:
@@ -64,10 +64,8 @@ class Channels(commands.Cog):
             
             
             if default:
-                category = await guild.create_category_channel(name=name+' team')
-
-                text = await category.create_text_channel(name + '-general')
-                voice = await category.create_voice_channel(name + '-meeting')
+                text_channel_name =name + '-general'
+                voice_channel_name = name + '-meeting'
 
             else:
                 
@@ -86,10 +84,15 @@ class Channels(commands.Cog):
                 except asyncio.TimeoutError:
                     await ctx.send("Timed out. Please try the command again.")
                     return
-                await ctx.send("Making category...")
-                text = await category.create_text_channel(voice_channel_name)
-                voice = await category.create_voice_channel(text_channel_name)
+                #await ctx.send("text name and voice: ", text_channel_name, type(voice_channel_name))
                 
+            
+                
+            await ctx.send("Making category...") 
+            category = await guild.create_category_channel(name=name+' team')  
+            text = await category.create_text_channel(text_channel_name)
+            voice = await category.create_voice_channel(voice_channel_name) 
+
             await text.set_permissions(role, read_messages=True, send_messages=True)
             await voice.set_permissions(role, connect=True)
 
@@ -98,8 +101,10 @@ class Channels(commands.Cog):
 
             await ctx.send(f"Created a team category for {name} team")
             await text.send(f"Welcome to the {name.upper()} team channel!")
+        
         else:
             await ctx.send(f"The role {name} does not exist.")
+
 
     @commands.command(brief='Delete a category and all channels within it', aliases=['del_cat', 'del_team'])
     @commands.has_permissions(administrator=True)
