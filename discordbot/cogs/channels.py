@@ -1,13 +1,9 @@
 from discord.ext import commands
 import discord
+import asyncio
 
 ### TODO: clean up delete function, change command aliases, redo bot end messages, maybe make a new cog file for member name listing
 """Create categories for channels, and try do for different channels like voice vs text"""
-# intents = discord.Intents.default()
-# intents.guilds = True
-# intents.messages = True
-# intents.reactions = True
-# intents.members = True
 
 class Channels(commands.Cog):
 
@@ -56,12 +52,44 @@ class Channels(commands.Cog):
 
         role = discord.utils.get(ctx.guild.roles, name=name)
         if role:
-            await ctx.send("Making category...")
-            category = await guild.create_category_channel(name=name+' team')
+            await ctx.send("Would you like to customize the voice and text channel names? y/n? (Default names would be applied otherwise)")
+            default = True
+            try:
+                customcheck = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout= 30)
+                if customcheck.content.upper() == 'Y':
+                    default = False
+            except asyncio.TimeoutError:
+                await ctx.send("Timed out. Please try the command again.")
+                return
+            
+            
+            if default:
+                category = await guild.create_category_channel(name=name+' team')
 
-            text = await category.create_text_channel(name + '-general')
-            voice = await category.create_voice_channel(name + '-meeting')
+                text = await category.create_text_channel(name + '-general')
+                voice = await category.create_voice_channel(name + '-meeting')
 
+            else:
+                
+                await ctx.send("Please enter the name for the text channel:")
+                try:
+                    text_channel_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
+                    text_channel_name = text_channel_name.content
+                except asyncio.TimeoutError:
+                    await ctx.send("Timed out. Please try the command again.")
+                    return
+                
+                await ctx.send("Please enter the name for the voice channel:")
+                try:
+                    voice_channel_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
+                    voice_channel_name = voice_channel_name.content
+                except asyncio.TimeoutError:
+                    await ctx.send("Timed out. Please try the command again.")
+                    return
+                await ctx.send("Making category...")
+                text = await category.create_text_channel(voice_channel_name)
+                voice = await category.create_voice_channel(text_channel_name)
+                
             await text.set_permissions(role, read_messages=True, send_messages=True)
             await voice.set_permissions(role, connect=True)
 
@@ -77,7 +105,7 @@ class Channels(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def delete_category(self, ctx, *, category_name):
         guild = ctx.guild
-        category = discord.utils.get(guild.categories, name=category_name + ' team')
+        category = discord.utils.get(guild.categories, name=category_name)
 
         if category:
             for channel in category.channels:
@@ -85,9 +113,9 @@ class Channels(commands.Cog):
 
             await category.delete()
 
-            await ctx.send(f"Category '{category_name} team' and all channels within it have been deleted.")
+            await ctx.send(f"Category '{category_name}' and all channels within it have been deleted.")
         else:
-            await ctx.send(f"Category '{category_name} team' not found.")
+            await ctx.send(f"Category '{category_name}' not found.")
 
 async def setup(bot):
   await bot.add_cog(Channels(bot))
