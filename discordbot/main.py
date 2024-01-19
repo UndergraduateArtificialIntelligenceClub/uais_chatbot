@@ -25,6 +25,7 @@ async def load_extensions():
     await bot.load_extension(f"cogs.faq")
     await bot.load_extension(f"cogs.auditlogs")
     # await bot.load_extension(f"cogs.googlecalendar")
+    await bot.load_extension(f"cogs.storeUserInfo")
 
 
 async def main():

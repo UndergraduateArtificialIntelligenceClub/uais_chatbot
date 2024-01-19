@@ -17,6 +17,11 @@ class StoreUserInfo(commands.Cog):
         discord_username = str(ctx.author.name)
         github_username = username
         
+        r = requests.get(f'https://api.github.com/users/{github_username}')
+        if r.status_code != 200:
+            await ctx.send(content=f'Github username {github_username} does not exist.')
+            return
+        
         with open(JSON_DATA, 'r') as f:
             data = json.load(f)
         
@@ -27,11 +32,6 @@ class StoreUserInfo(commands.Cog):
         
         with open(JSON_DATA, 'w') as f:
             f.write(json.dumps(data))
-            
-        r = requests.get(f'https://api.github.com/users/{github_username}')
-        if r.status_code != 200:
-            await ctx.send(content=f'Github username {github_username} does not exist.')
-            return
         
         await ctx.send(content=f'Linked {discord_username} to {github_username}')
         
@@ -42,6 +42,18 @@ class StoreUserInfo(commands.Cog):
             return
         discord_username = str(ctx.author.name)
         real_name = name
+        
+        with open(JSON_DATA, 'r') as f:
+            data = json.load(f)
+            
+        if discord_username in data:
+            data[discord_username]['name'] = real_name
+        else:
+            data[discord_username] = {'name': real_name}
+            
+        with open(JSON_DATA, 'w') as f:
+            f.write(json.dumps(data))
+        
         await ctx.send(content=f'Linked {discord_username} to {real_name}')
         
     @commands.command(brief="Looks up a discord account's real name and github username.")
@@ -50,6 +62,7 @@ class StoreUserInfo(commands.Cog):
             await ctx.send(content='Please provide a discord account to look up.')
             return
         await ctx.send(content='hi')
+        
         
 async def setup(bot):
     await bot.add_cog(StoreUserInfo(bot))
