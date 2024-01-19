@@ -2,6 +2,7 @@ from discord.ext import commands
 import json
 import requests
 
+
 JSON_DATA = 'data.json'
 
 class StoreUserInfo(commands.Cog):
@@ -22,8 +23,11 @@ class StoreUserInfo(commands.Cog):
             await ctx.send(content=f'Github username {github_username} does not exist.')
             return
         
-        with open(JSON_DATA, 'r') as f:
-            data = json.load(f)
+        try:
+            with open(JSON_DATA, 'r') as f:
+                data = json.load(f)
+        except:  # incorrect json format
+            data = {}
         
         if discord_username in data:
             data[discord_username]['github'] = github_username
@@ -43,8 +47,11 @@ class StoreUserInfo(commands.Cog):
         discord_username = str(ctx.author.name)
         real_name = name
         
-        with open(JSON_DATA, 'r') as f:
-            data = json.load(f)
+        try:
+            with open(JSON_DATA, 'r') as f:
+                data = json.load(f)
+        except:
+            data = {}
             
         if discord_username in data:
             data[discord_username]['name'] = real_name
@@ -57,12 +64,24 @@ class StoreUserInfo(commands.Cog):
         await ctx.send(content=f'Linked {discord_username} to {real_name}')
         
     @commands.command(brief="Looks up a discord account's real name and github username.")
-    async def lookupname(self, ctx, discord=None):
-        if not discord:
+    async def lookup(self, ctx, member=None):
+        # TODO: lookup autocomplete?
+        if not member:
             await ctx.send(content='Please provide a discord account to look up.')
             return
-        await ctx.send(content='hi')
         
+        try:
+            with open(JSON_DATA, 'r') as f:
+                data = json.load(f)
+        except:
+            await ctx.send(content=f'data file is broken :(')
+        
+        if member in data:
+            user_data = data[member]
+            await ctx.send(content=f'Name: {user_data["name"]}\nGithub: {user_data["github"]}')
+        else:
+            await ctx.send(content=f'No data found for {member}')
+                
         
 async def setup(bot):
     await bot.add_cog(StoreUserInfo(bot))
