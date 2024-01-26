@@ -45,7 +45,7 @@ class GoogleCalendarAPI:
             print(f"Google calendar initialization failed: {error}")
             return None
 
-    def list_events(self, max_results=10):
+    def get_events(self, max_results=10):
         try:
             # Call the Calendar API
             now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
@@ -64,31 +64,7 @@ class GoogleCalendarAPI:
             )
             events = events_result.get("items", [])
 
-            if not events:
-                return "No upcoming events found."
-
-            # Sends the start and name of the next events_num events
-            payload = ""
-            for event in events:
-                # Get event start time
-                start = event["start"].get(
-                    "dateTime", event["start"].get("date"))
-                # Convert to human readable format
-                start_dt = datetime.fromisoformat(start)
-                formatted_start = start_dt.strftime(
-                    "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
-
-                # # Get tags, if available
-                # tags_json = event.get('extendedProperties', {}).get(
-                #     'private', {}).get('tags', '')
-                # tags = json.loads(tags_json) if tags_json else []
-
-                # # Format tags for display
-                # tags_str = ", ".join(tags) if tags else "No Tags"
-
-                payload += f"**{formatted_start}:** {event['summary']}\n"
-
-            return payload
+            return events
 
         except HttpError as error:
             return f"An error occured: {error}"

@@ -13,11 +13,34 @@ class Calendar(commands.Cog):
 
     @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
     async def events(self, ctx, events_num=10):
-        if (not isinstance(events_num, int)) or (events_num < 1) or (events_num > 30):
+        if (events_num < 1) or (events_num > 30):
             await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
             return
 
-        await ctx.send(content=self.google_calendar.list_events(events_num))
+        events = self.google_calendar.get_events(events_num)
+        if not events:
+            await ctx.send(content="No upcoming events found.")
+
+        output = ""
+        for event in events:
+            # Get event start time
+            start = event["start"].get("dateTime", event["start"].get("date"))
+
+            # Convert to human readable format
+            start_dt = datetime.fromisoformat(start)
+            formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+
+            # # Get tags, if available
+            # tags_json = event.get('extendedProperties', {}).get(
+            #     'private', {}).get('tags', '')
+            # tags = json.loads(tags_json) if tags_json else []
+
+            # # Format tags for display
+            # tags_str = ", ".join(tags) if tags else "No Tags"
+
+            output += f"**{formatted_start}:** {event['summary']}\n"
+
+        await ctx.send(content=output)
 
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     @commands.has_permissions(administrator=True)
@@ -71,8 +94,7 @@ class Calendar(commands.Cog):
             tags = argument_list[5].strip().split(',')
 
         try:
-            start_time = datetime.strptime(
-                argument_list[3], "%d/%m/%Y %H:%M:%S")
+            start_time = datetime.strptime(argument_list[3], "%d/%m/%Y %H:%M:%S")
             end_time = datetime.strptime(argument_list[4], "%d/%m/%Y %H:%M:%S")
         except ValueError:
             await ctx.send(content="Could not convert start_time or end_time to datetime object")
