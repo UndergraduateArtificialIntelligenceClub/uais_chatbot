@@ -209,8 +209,8 @@ class EventCreationView(discord.ui.View):
             end_time = start_time + timedelta(minutes=duration_minutes)
 
             # Prepare event information
-            self.event_data["start_time"] = start_time.isoformat()
-            self.event_data["end_time"] = end_time.isoformat()
+            self.event_data["start_time"] = start_time
+            self.event_data["end_time"] = end_time
 
         return error_payload
 
