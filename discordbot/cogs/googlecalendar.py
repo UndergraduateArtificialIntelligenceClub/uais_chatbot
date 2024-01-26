@@ -39,9 +39,10 @@ class Calendar(commands.Cog):
         summary = event.get('summary')
         start_formatted = start_dt.strftime(
             "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
-        message = f"{roles_mention}\nReminder: **{summary}** is starting soon!\n\nStart time: **{start_formatted}**"
 
-        return message
+        output = f"{roles_mention}\nReminder: **{summary}** is starting soon!\nStart time: **{start_formatted}**"
+
+        return output
 
     @tasks.loop(minutes=10)
     async def check_events(self):
@@ -63,7 +64,6 @@ class Calendar(commands.Cog):
             start_dt = datetime.fromisoformat(start)
 
             if now + self.reminder_time_before >= start_dt:
-                # Send a reminder
                 await reminder_channel.send(self.get_event_reminder(event, start_dt))
 
     @check_events.before_loop
