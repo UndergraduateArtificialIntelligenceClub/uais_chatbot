@@ -1,6 +1,7 @@
 from api.google_calendar_api import GoogleCalendarAPI
 from views.event_creation_view import EventCreationView
 from discord.ext import commands
+from datetime import datetime
 
 
 class Calendar(commands.Cog):
@@ -43,24 +44,44 @@ class Calendar(commands.Cog):
 
         # Get event data
         event_data = event_creation_view.event_data
-        event_list = [event_data.get("summary"), event_data.get("location"),
-                      event_data.get("description"), event_data.get("start_time"), event_data.get("end_time")]
+        response = self.google_calendar.create_event(event_data.get("summary"), event_data.get("location"),
+                                                     event_data.get("description"), event_data.get("start_time"), event_data.get("end_time"), tags=event_data.get("tags"))
 
-        payload = ",".join(event_list)
-        await ctx.send(content=self.google_calendar.create_event(payload))
+        await ctx.send(content=response)
 
     @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
     @commands.has_permissions(administrator=True)
     async def plancli(self, ctx, *, payload=""):
         if not payload:
-            await ctx.send(content="!plancli Summary,Location,Description,Start time,End time\ne.g.\n!plancli Test event,University of Alberta,Description,2023-12-20T09:00:00,2023-12-21T17:00:00")
+            line_1 = r'!plancli Summary;Location;Description;Start time: %d/%m/%Y %H:%M:%S;End time: %d/%m/%Y %H:%M:%S;tag1, tag2, ...'
+            line_2 = '!plancli Test event;University of Alberta;Description;12/11/2024 09:15:30;12/11/2024 10:00:00; tag1, tag2'
+
+            await ctx.send(content=line_1+"\n"+line_2)
             return
 
-        response = self.google_calendar.create_event(payload)
+        argument_list = payload.split(';')
 
-        if not response:
+        if (len(argument_list) != 5) and (len(argument_list) != 6):
             await ctx.send(content="Invalid number of arguments. Call !plancli without arguments to see proper format example")
             return
+
+        if len(argument_list) == 5:
+            tags = None
+        else:
+            tags = argument_list[5].strip().split(',')
+
+        try:
+            start_time = datetime.strptime(
+                argument_list[3], "%d/%m/%Y %H:%M:%S")
+            end_time = datetime.strptime(argument_list[4], "%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            await ctx.send(content="Could not convert start_time or end_time to datetime object")
+
+        try:
+            response = self.google_calendar.create_event(
+                argument_list[0], argument_list[1], argument_list[2], start_time, end_time, tags)
+        except Exception as e:
+            print(e)
 
         await ctx.send(content=response)
 
