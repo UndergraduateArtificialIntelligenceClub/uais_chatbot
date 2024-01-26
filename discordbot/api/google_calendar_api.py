@@ -1,4 +1,5 @@
 import os
+import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -77,6 +78,14 @@ class GoogleCalendarAPI:
                 formatted_start = start_dt.strftime(
                     "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
+                # # Get tags, if available
+                # tags_json = event.get('extendedProperties', {}).get(
+                #     'private', {}).get('tags', '')
+                # tags = json.loads(tags_json) if tags_json else []
+
+                # # Format tags for display
+                # tags_str = ", ".join(tags) if tags else "No Tags"
+
                 payload += f"**{formatted_start}:** {event['summary']}\n"
 
             return payload
@@ -84,24 +93,26 @@ class GoogleCalendarAPI:
         except HttpError as error:
             return f"An error occured: {error}"
 
-    def create_event(self, event_data):
-        # Summary,Location,Description,Start time,End time
-        # Test event,University of Alberta,Description,2023-12-20T09:00:00,2023-12-21T17:00:00
+    def create_event(self, summary, location, description, start_time: datetime, end_time: datetime, tags: list = None):
+        # Example arguments:
+        # Test event, University of Alberta, Description, datetime start time, datetime end time, ["tag1"]
 
-        arguments = event_data.split(',')
-        if len(arguments) != 5:
+        if not summary or not start_time or not end_time:
             return None
 
+        # Convert tags list to a JSON string
+        tags_json = json.dumps(tags) if tags is not None else ''
+
         event = {
-            'summary': arguments[0],
-            'location': arguments[1],
-            'description': arguments[2],
+            'summary': summary,
+            'location': location,
+            'description': description,
             'start': {
-                'dateTime': arguments[3],
+                'dateTime': start_time.isoformat(),
                 'timeZone': TIMEZONE,
             },
             'end': {
-                'dateTime': arguments[4],
+                'dateTime': end_time.isoformat(),
                 'timeZone': TIMEZONE,
             },
             'reminders': {
@@ -111,6 +122,11 @@ class GoogleCalendarAPI:
                     {'method': 'popup', 'minutes': 10},
                 ],
             },
+            'extendedProperties': {
+                'private': {
+                    'tags': tags_json  # Additional info to store with event
+                }
+            }
         }
 
         try:
