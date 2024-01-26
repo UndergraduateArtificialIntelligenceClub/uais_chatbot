@@ -1,7 +1,15 @@
+import os
+import json
+import pytz
+import discord
 from api.google_calendar_api import GoogleCalendarAPI
 from views.event_creation_view import EventCreationView
-from discord.ext import commands
-from datetime import datetime
+from discord.ext import commands, tasks
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+TIMEZONE = os.environ['TIMEZONE']
 
 
 class Calendar(commands.Cog):
@@ -10,37 +18,80 @@ class Calendar(commands.Cog):
         self.bot = bot
         self.google_calendar = GoogleCalendarAPI()
         self.active_menus = set()
+        self.reminder_channel_id = None  # Set this via a command
+        self.guild = None
+        # Default time before event to send reminder
+        self.reminder_time_before = timedelta(hours=2)
+        self.check_events.start()
 
-    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
-    async def events(self, ctx, events_num=10):
-        if (events_num < 1) or (events_num > 30):
-            await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
+    def get_event_reminder(self, event, start_dt):
+        # Get roles, if available (stored in tags property)
+        roles_json = event.get('extendedProperties', {}).get(
+            'private', {}).get('tags', '')
+        roles = json.loads(roles_json) if roles_json else []
+
+        # Format roles for display
+        roles_mention = ""
+        for role_name in roles:
+            role = discord.utils.get(self.guild.roles, name=role_name.strip())
+            roles_mention += f"{role.mention} " if role is not None else f"@{role_name.strip()} "
+
+        summary = event.get('summary')
+        start_formatted = start_dt.strftime(
+            "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+        message = f"{roles_mention}\nReminder: **{summary}** is starting soon!\n\nStart time: **{start_formatted}**"
+
+        return message
+
+    @tasks.loop(minutes=10)
+    async def check_events(self):
+        if self.reminder_channel_id is None:
             return
 
-        events = self.google_calendar.get_events(events_num)
-        if not events:
-            await ctx.send(content="No upcoming events found.")
+        reminder_channel = self.bot.get_channel(self.reminder_channel_id)
+        if reminder_channel is None:
+            return
 
-        output = ""
-        for event in events:
-            # Get event start time
+        upcoming_events = self.google_calendar.get_events(10)
+        if not upcoming_events:
+            return
+
+        now = datetime.now(pytz.timezone(TIMEZONE))
+
+        for event in upcoming_events:
             start = event["start"].get("dateTime", event["start"].get("date"))
-
-            # Convert to human readable format
             start_dt = datetime.fromisoformat(start)
-            formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
-            # # Get tags, if available
-            # tags_json = event.get('extendedProperties', {}).get(
-            #     'private', {}).get('tags', '')
-            # tags = json.loads(tags_json) if tags_json else []
+            if now + self.reminder_time_before >= start_dt:
+                # Send a reminder
+                await reminder_channel.send(self.get_event_reminder(event, start_dt))
 
-            # # Format tags for display
-            # tags_str = ", ".join(tags) if tags else "No Tags"
+    @check_events.before_loop
+    async def before_check_events(self):
+        await self.bot.wait_until_ready()
 
-            output += f"**{formatted_start}:** {event['summary']}\n"
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def setreminderchannel(self, ctx, channel_id: int):
+        try:
+            self.bot.get_channel(channel_id)
+        except Exception as e:
+            await ctx.send("Canot get_channel with provided channel id.")
+            return
 
-        await ctx.send(content=output)
+        self.reminder_channel_id = channel_id
+        self.guild = ctx.guild
+        await ctx.send(f"Reminder channel set to <#{channel_id}>.")
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def setremindertime(self, ctx, hours_before: int):
+        if (hours_before < 1):
+            await ctx.send("Invalid reminder time.")
+            return
+
+        self.reminder_time_before = datetime.timedelta(hours=hours_before)
+        await ctx.send(f"Reminders will be sent {hours_before} hours before events.")
 
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     @commands.has_permissions(administrator=True)
@@ -94,7 +145,8 @@ class Calendar(commands.Cog):
             tags = argument_list[5].strip().split(',')
 
         try:
-            start_time = datetime.strptime(argument_list[3], "%d/%m/%Y %H:%M:%S")
+            start_time = datetime.strptime(
+                argument_list[3], "%d/%m/%Y %H:%M:%S")
             end_time = datetime.strptime(argument_list[4], "%d/%m/%Y %H:%M:%S")
         except ValueError:
             await ctx.send(content="Could not convert start_time or end_time to datetime object")
@@ -106,6 +158,30 @@ class Calendar(commands.Cog):
             print(e)
 
         await ctx.send(content=response)
+
+    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
+    async def events(self, ctx, events_num=10):
+        if (events_num < 1) or (events_num > 30):
+            await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
+            return
+
+        upcoming_events = self.google_calendar.get_events(events_num)
+        if not upcoming_events:
+            await ctx.send(content="No upcoming events found.")
+
+        output = ""
+        for event in upcoming_events:
+            # Get event start time
+            start = event["start"].get("dateTime", event["start"].get("date"))
+
+            # Convert to human readable format
+            start_dt = datetime.fromisoformat(start)
+            formatted_start = start_dt.strftime(
+                "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+
+            output += f"**{formatted_start}:** {event['summary']}\n"
+
+        await ctx.send(content=output)
 
 
 async def setup(bot):
