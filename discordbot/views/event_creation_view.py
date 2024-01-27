@@ -132,13 +132,6 @@ def return_valid_duration(duration: str):
     return duration_minutes if duration_minutes > 0 else False
 
 
-SELECT_OPTIONS = [
-    discord.SelectOption(label='Role0', value = "0"),
-    discord.SelectOption(label='Role1', value = "1"),
-    discord.SelectOption(label='Role2', value = "2")
-]
-
-
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
@@ -156,7 +149,7 @@ class EventCreationView(discord.ui.View):
             "start_time": "",
             "end_time": ""
         }
-        self.selected_roles=None
+        self.selected_roles = None
         self.name_modal_submitted = False
         self.date_modal_submitted = False
 
@@ -287,5 +280,5 @@ class EventCreationView(discord.ui.View):
 
     @discord.ui.select(cls=discord.ui.RoleSelect, placeholder='Roles to ping', min_values=0, max_values=25, row=1)
     async def select_roles(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
-        self.selected_roles=[role.name for role in select.values]
+        self.selected_roles = [role.name for role in select.values]
         await interaction.response.edit_message(view=self, content=f'**You selected roles:** {", ".join(self.selected_roles)}')
