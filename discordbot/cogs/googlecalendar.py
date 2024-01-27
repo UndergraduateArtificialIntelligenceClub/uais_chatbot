@@ -22,8 +22,9 @@ class Calendar(commands.Cog):
         self.guild = None
         # Default time before event to send reminder
         self.reminder_time_before = timedelta(hours=2)
+        self.notified_events = set()
         self.check_events.start()
-    
+
     def get_event_mentions(self, event):
         # Get roles, if available (stored in tags property)
         roles_json = event.get('extendedProperties', {}).get(
@@ -43,12 +44,15 @@ class Calendar(commands.Cog):
         start_formatted = start_dt.strftime(
             "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
-        embed = discord.Embed(title=f"Reminder:\n**{summary}** is starting soon!", color=discord.Color.random())
+        embed = discord.Embed(
+            title=f"Reminder:\n**{summary}** is starting soon!", color=discord.Color.random())
 
-        embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
+        embed.add_field(name="Start time:",
+                        value=f"**{start_formatted}**", inline=False)
 
         if description:
-            embed.add_field(name="Description:", value=description, inline=False)
+            embed.add_field(name="Description:",
+                            value=description, inline=False)
         if location:
             embed.add_field(name="Location:", value=location, inline=False)
 
@@ -69,8 +73,10 @@ class Calendar(commands.Cog):
             start_iso = event["start"].get(
                 "dateTime", event["start"].get("date"))
             start = datetime.fromisoformat(start_iso)
+            id = event.get("id")
 
-            if now + self.reminder_time_before >= start:
+            if now + self.reminder_time_before >= start and (id not in self.notified_events):
+                self.notified_events.add(id)
                 await self.reminder_channel.send(content=self.get_event_mentions(event), embed=self.get_reminder_embed(event, start))
 
     @check_events.before_loop
