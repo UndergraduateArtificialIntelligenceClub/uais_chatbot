@@ -21,7 +21,7 @@ class Calendar(commands.Cog):
         self.reminder_channel = None  # Set this via a command
         self.guild = None
         # Default time before event to send reminder
-        self.reminder_time_before = timedelta(hours=2)
+        self.reminder_time_before = timedelta(hours=5)
         self.notified_events = set()
         self.check_events.start()
 
@@ -98,11 +98,12 @@ class Calendar(commands.Cog):
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def setremindertime(self, ctx, hours_before: int):
+        
         if (hours_before < 1):
             await ctx.send("Invalid reminder time.")
             return
 
-        self.reminder_time_before = datetime.timedelta(hours=hours_before)
+        self.reminder_time_before = timedelta(hours=hours_before)
         await ctx.send(f"Reminders will be sent {hours_before} hours before events.")
 
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
@@ -130,8 +131,10 @@ class Calendar(commands.Cog):
 
         # Get event data
         event_data = event_creation_view.event_data
+        roles_to_remind = event_creation_view.selected_roles
+
         response = self.google_calendar.create_event(event_data.get("summary"), event_data.get("location"),
-                                                     event_data.get("description"), event_data.get("start_time"), event_data.get("end_time"), tags=event_data.get("tags"))
+                                                     event_data.get("description"), event_data.get("start_time"), event_data.get("end_time"), tags=roles_to_remind)
 
         await ctx.send(content=response)
 
