@@ -132,6 +132,13 @@ def return_valid_duration(duration: str):
     return duration_minutes if duration_minutes > 0 else False
 
 
+SELECT_OPTIONS = [
+    discord.SelectOption(label='Role0', value = "0"),
+    discord.SelectOption(label='Role1', value = "1"),
+    discord.SelectOption(label='Role2', value = "2")
+]
+
+
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
@@ -149,6 +156,7 @@ class EventCreationView(discord.ui.View):
             "start_time": "",
             "end_time": ""
         }
+        self.selected_roles=None
         self.name_modal_submitted = False
         self.date_modal_submitted = False
 
@@ -219,7 +227,7 @@ class EventCreationView(discord.ui.View):
 
         return error_payload
 
-    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary, row=0)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
         modal = EventNamingModal(
@@ -242,7 +250,7 @@ class EventCreationView(discord.ui.View):
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
-    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary, row=0)
     async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
         modal = EventDateModal(
@@ -269,10 +277,15 @@ class EventCreationView(discord.ui.View):
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
-    @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
+    @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True, row=0)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Clear items, respond to interaction, and stop
         self.clear_items()
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.stop()
+
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder='Roles to ping', min_values=0, max_values=25, row=1)
+    async def select_roles(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
+        self.selected_roles=[role.name for role in select.values]
+        await interaction.response.edit_message(view=self, content=f'**You selected roles:** {", ".join(self.selected_roles)}')
