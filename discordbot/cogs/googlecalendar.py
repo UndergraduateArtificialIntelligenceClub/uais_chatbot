@@ -18,39 +18,45 @@ class Calendar(commands.Cog):
         self.bot = bot
         self.google_calendar = GoogleCalendarAPI()
         self.active_menus = set()
-        self.reminder_channel_id = None  # Set this via a command
+        self.reminder_channel = None  # Set this via a command
         self.guild = None
         # Default time before event to send reminder
         self.reminder_time_before = timedelta(hours=2)
         self.check_events.start()
-
-    def get_event_reminder(self, event, start_dt):
+    
+    def get_event_mentions(self, event):
         # Get roles, if available (stored in tags property)
         roles_json = event.get('extendedProperties', {}).get(
             'private', {}).get('tags', '')
         roles = json.loads(roles_json) if roles_json else []
 
-        # Format roles for display
-        roles_mention = ""
-        for role_name in roles:
-            role = discord.utils.get(self.guild.roles, name=role_name.strip())
-            roles_mention += f"{role.mention} " if role is not None else f"@{role_name.strip()} "
+        roles_mention = " ".join([f"{role.mention}" for role_name in roles if (
+            role := discord.utils.get(self.guild.roles, name=role_name.strip())) is not None])
 
+        return roles_mention
+
+    def get_reminder_embed(self, event, start_dt):
         summary = event.get('summary')
+        description = event.get('description')
+        location = event.get('location')
+
         start_formatted = start_dt.strftime(
             "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
-        output = f"{roles_mention}\nReminder: **{summary}** is starting soon!\nStart time: **{start_formatted}**"
+        embed = discord.Embed(title=f"Reminder:\n**{summary}** is starting soon!", color=discord.Color.random())
 
-        return output
+        embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
+
+        if description:
+            embed.add_field(name="Description:", value=description, inline=False)
+        if location:
+            embed.add_field(name="Location:", value=location, inline=False)
+
+        return embed
 
     @tasks.loop(minutes=10)
     async def check_events(self):
-        if self.reminder_channel_id is None:
-            return
-
-        reminder_channel = self.bot.get_channel(self.reminder_channel_id)
-        if reminder_channel is None:
+        if self.reminder_channel is None:
             return
 
         upcoming_events = self.google_calendar.get_events(10)
@@ -60,11 +66,12 @@ class Calendar(commands.Cog):
         now = datetime.now(pytz.timezone(TIMEZONE))
 
         for event in upcoming_events:
-            start = event["start"].get("dateTime", event["start"].get("date"))
-            start_dt = datetime.fromisoformat(start)
+            start_iso = event["start"].get(
+                "dateTime", event["start"].get("date"))
+            start = datetime.fromisoformat(start_iso)
 
-            if now + self.reminder_time_before >= start_dt:
-                await reminder_channel.send(self.get_event_reminder(event, start_dt))
+            if now + self.reminder_time_before >= start:
+                await self.reminder_channel.send(content=self.get_event_mentions(event), embed=self.get_reminder_embed(event, start))
 
     @check_events.before_loop
     async def before_check_events(self):
@@ -73,13 +80,12 @@ class Calendar(commands.Cog):
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def setreminderchannel(self, ctx, channel_id: int):
-        try:
-            self.bot.get_channel(channel_id)
-        except Exception as e:
-            await ctx.send("Canot get_channel with provided channel id.")
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            await ctx.send("Cannot get_channel with provided channel id.")
             return
 
-        self.reminder_channel_id = channel_id
+        self.reminder_channel = channel
         self.guild = ctx.guild
         await ctx.send(f"Reminder channel set to <#{channel_id}>.")
 

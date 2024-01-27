@@ -14,21 +14,26 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
         style=discord.TextStyle.short,
         label="Title",
         required=True,
-        placeholder="Event Summary"
+        placeholder="Event Summary",
+        # This is 224 because a title of a reminder embed can only be 256 characters
+        # And the format I use for the title is title=f"Reminder:\n**{summary}** is starting soon!"
+        max_length=224
     )
 
     description = discord.ui.TextInput(
         style=discord.TextStyle.long,
         label="Description",
         required=False,
-        placeholder="Event Description (optional)"
+        placeholder="Event Description (optional)",
+        max_length=1024
     )
 
     location = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Location",
         required=False,
-        placeholder="Event Location (optional)"
+        placeholder="Event Location (optional)",
+        max_length=1024
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
