@@ -36,7 +36,7 @@ class Calendar(commands.Cog):
 
         return roles_mention
 
-    def get_reminder_embed(self, event, start_dt):
+    def get_reminder_embed(self, event, start_dt: datetime):
         summary = event.get('summary')
         description = event.get('description')
         location = event.get('location')
@@ -44,8 +44,20 @@ class Calendar(commands.Cog):
         start_formatted = start_dt.strftime(
             "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
-        embed = discord.Embed(
-            title=f"Reminder:\n**{summary}** is starting soon!", color=discord.Color.random())
+        now = datetime.now(start_dt.tzinfo)
+        time_diff = start_dt - now
+
+        before_start = int(time_diff.total_seconds() / 3600)
+        unit = f"hour{'s' if before_start != 1 else ''}"
+        
+        # If it turns out the event begins in less than 1 hour, present title in minutes
+        if before_start == 0:
+            before_start = int(time_diff.total_seconds() / 60)
+            unit = f"minute{'s' if before_start != 1 else ''}"
+
+        title = f"Reminder:\n**{summary}** starts in **{before_start}** {unit}!"
+
+        embed = discord.Embed(title=title, color=discord.Color.random())
 
         embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
 
@@ -56,7 +68,7 @@ class Calendar(commands.Cog):
 
         return embed
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(minutes=1)
     async def event_reminders(self):
         if self.reminder_channel is None:
             return
