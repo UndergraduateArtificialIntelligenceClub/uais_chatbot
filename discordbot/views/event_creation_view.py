@@ -15,9 +15,9 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
         label="Title",
         required=True,
         placeholder="Event Summary",
-        # This is 224 because a title of a reminder embed can only be 256 characters
-        # And the format I use for the title is title=f"Reminder:\n**{summary}** is starting soon!"
-        max_length=224
+        # This is 200 because a title of a reminder embed can only be 256 characters
+        # And the format I use for the title is title=f"Reminder:\n**{summary}** starts in **{before_start}** {unit}!"
+        max_length=200
     )
 
     description = discord.ui.TextInput(
