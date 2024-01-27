@@ -26,6 +26,9 @@ class Calendar(commands.Cog):
         self.reminded_events = set()
         self.event_reminders.start()
 
+    def cog_unload(self):
+        self.event_reminders.cancel()
+
     def get_event_mentions(self, event):
         # Get roles, if available (stored in tags property)
         roles_json = event.get('extendedProperties', {}).get('private', {}).get('tags', '')
@@ -109,8 +112,8 @@ class Calendar(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def setremindertime(self, ctx, hours_before: int):
         
-        if (hours_before < 1):
-            await ctx.send("Invalid reminder time.")
+        if (hours_before < 1 or hours_before > 500):
+            await ctx.send("Invalid reminder time. Must be int in [1, 500]")
             return
 
         self.reminder_time_before = timedelta(hours=hours_before)
