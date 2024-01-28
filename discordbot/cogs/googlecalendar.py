@@ -12,6 +12,55 @@ load_dotenv()
 TIMEZONE = os.environ['TIMEZONE']
 
 
+def get_event_mentions(event, guild: discord.Guild):
+    # Get roles, if available (stored in tags property)
+    roles_json = event.get('extendedProperties', {}).get(
+        'private', {}).get('tags', '')
+    roles = json.loads(roles_json) if roles_json else None
+
+    if roles is None:
+        return ""
+
+    roles_mention = " ".join([f"{role.mention}" for role_name in roles if (
+        role := discord.utils.get(guild.roles, name=role_name.strip())) is not None])
+
+    return roles_mention
+
+
+def get_reminder_embed(event, start_dt: datetime):
+    summary = event.get('summary')
+    description = event.get('description')
+    location = event.get('location')
+
+    start_formatted = start_dt.strftime(
+        "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+
+    now = datetime.now(start_dt.tzinfo)
+    time_diff = start_dt - now
+
+    hrs_left = int(time_diff.total_seconds() / 3600)
+    hours = f"hour{'s' if hrs_left != 1 else ''}"
+
+    mins_left = int(time_diff.total_seconds() / 60) - (hrs_left * 60)
+    minutes = f"minute{'s' if mins_left != 1 else ''}"
+
+    if hrs_left == 0:
+        title = f"Reminder:\n**{summary}** starts in **{mins_left}** {minutes}!"
+    else:
+        title = f"Reminder:\n**{summary}** starts in **{hrs_left}** {hours} **{mins_left}** {minutes}!"
+
+    embed = discord.Embed(title=title, color=discord.Color.random())
+
+    embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
+
+    if description:
+        embed.add_field(name="Description:", value=description, inline=False)
+    if location:
+        embed.add_field(name="Location:", value=location, inline=False)
+
+    return embed
+
+
 class Calendar(commands.Cog):
 
     def __init__(self, bot):
@@ -28,48 +77,6 @@ class Calendar(commands.Cog):
 
     def cog_unload(self):
         self.event_reminders.cancel()
-
-    def get_event_mentions(self, event):
-        # Get roles, if available (stored in tags property)
-        roles_json = event.get('extendedProperties', {}).get('private', {}).get('tags', '')
-        roles = json.loads(roles_json) if roles_json else []
-
-        roles_mention = " ".join([f"{role.mention}" for role_name in roles if (
-            role := discord.utils.get(self.guild.roles, name=role_name.strip())) is not None])
-
-        return roles_mention
-
-    def get_reminder_embed(self, event, start_dt: datetime):
-        summary = event.get('summary')
-        description = event.get('description')
-        location = event.get('location')
-
-        start_formatted = start_dt.strftime(
-            "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
-
-        now = datetime.now(start_dt.tzinfo)
-        time_diff = start_dt - now
-
-        before_start = int(time_diff.total_seconds() / 3600)
-        unit = f"hour{'s' if before_start != 1 else ''}"
-        
-        # If it turns out the event begins in less than 1 hour, present title in minutes
-        if before_start == 0:
-            before_start = int(time_diff.total_seconds() / 60)
-            unit = f"minute{'s' if before_start != 1 else ''}"
-
-        title = f"Reminder:\n**{summary}** starts in **{before_start}** {unit}!"
-
-        embed = discord.Embed(title=title, color=discord.Color.random())
-
-        embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
-
-        if description:
-            embed.add_field(name="Description:", value=description, inline=False)
-        if location:
-            embed.add_field(name="Location:", value=location, inline=False)
-
-        return embed
 
     @tasks.loop(minutes=1)
     async def event_reminders(self):
@@ -90,7 +97,7 @@ class Calendar(commands.Cog):
 
             if id not in self.reminded_events and now + self.reminder_time_before >= start:
                 self.reminded_events.add(id)
-                await self.reminder_channel.send(content=self.get_event_mentions(event), embed=self.get_reminder_embed(event, start))
+                await self.reminder_channel.send(content=get_event_mentions(event, self.guild), embed=get_reminder_embed(event, start))
 
     @event_reminders.before_loop
     async def before_event_reminders(self):
@@ -111,7 +118,7 @@ class Calendar(commands.Cog):
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def setremindertime(self, ctx, hours_before: int):
-        
+
         if (hours_before < 1 or hours_before > 500):
             await ctx.send("Invalid reminder time. Must be int in [1, 500]")
             return
@@ -167,16 +174,19 @@ class Calendar(commands.Cog):
             await ctx.send(content="Invalid number of arguments. Call !plancli without arguments to see proper format example")
             return
 
-        tags = argument_list[5].strip().split(',') if len(argument_list) > 5 else None
+        tags = argument_list[5].strip().split(
+            ',') if len(argument_list) > 5 else None
 
         try:
-            start_time = datetime.strptime(argument_list[3], "%d/%m/%Y %H:%M:%S")
+            start_time = datetime.strptime(
+                argument_list[3], "%d/%m/%Y %H:%M:%S")
             end_time = datetime.strptime(argument_list[4], "%d/%m/%Y %H:%M:%S")
         except ValueError:
             await ctx.send(content="Could not convert start_time or end_time to datetime object")
             return
 
-        response = self.google_calendar.create_event(argument_list[0], argument_list[1], argument_list[2], start_time, end_time, tags)
+        response = self.google_calendar.create_event(
+            argument_list[0], argument_list[1], argument_list[2], start_time, end_time, tags)
 
         await ctx.send(content=response)
 
