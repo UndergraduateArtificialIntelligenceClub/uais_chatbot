@@ -63,14 +63,15 @@ def get_reminder_embed(event, start_dt: datetime):
 
 class Calendar(commands.Cog):
 
-    def __init__(self, bot):
+    def __init__(self, bot: discord.ext.commands.Bot):
         self.bot = bot
         self.google_calendar = GoogleCalendarAPI()
         self.active_menus = set()
         # Set this via a command
-        self.reminder_channel = None
-        self.guild = None
-        # Default time before event to send reminder
+        self.reminder_channel_id = None
+        # Remembering values above 
+        self.settings_file = 'reminderchannel.json'
+        self.load_settings()
         self.reminder_time_before = timedelta(hours=5)
         self.reminded_events = set()
         self.event_reminders.start()
@@ -78,9 +79,28 @@ class Calendar(commands.Cog):
     def cog_unload(self):
         self.event_reminders.cancel()
 
+    def load_settings(self):
+        try:
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                channel_id = settings.get('reminder_channel_id')
+                self.reminder_channel_id = channel_id
+        except FileNotFoundError:
+            self.save_settings()  # Create the file if it doesn't exist
+            return
+
+    def save_settings(self):
+        settings = {
+            'reminder_channel_id': self.reminder_channel_id,
+        }
+        with open(self.settings_file, 'w') as f:
+            json.dump(settings, f, indent=4)
+
     @tasks.loop(minutes=1)
     async def event_reminders(self):
-        if self.reminder_channel is None:
+
+        reminder_channel = self.bot.get_channel(self.reminder_channel_id)
+        if reminder_channel is None:
             return
 
         upcoming_events = self.google_calendar.get_events(10)
@@ -97,7 +117,7 @@ class Calendar(commands.Cog):
 
             if id not in self.reminded_events and now + self.reminder_time_before >= start:
                 self.reminded_events.add(id)
-                await self.reminder_channel.send(content=get_event_mentions(event, self.guild), embed=get_reminder_embed(event, start))
+                await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild), embed=get_reminder_embed(event, start))
 
     @event_reminders.before_loop
     async def before_event_reminders(self):
@@ -108,17 +128,16 @@ class Calendar(commands.Cog):
     async def setreminderchannel(self, ctx, channel_id: int):
         channel = self.bot.get_channel(channel_id)
         if channel is None:
-            await ctx.send("Cannot get_channel with provided channel id.")
+            await ctx.send("Cannot access channel with provided channel id.")
             return
 
-        self.reminder_channel = channel
-        self.guild = ctx.guild
-        await ctx.send(f"Reminder channel set to <#{channel_id}>.")
+        self.reminder_channel_id = channel_id
+        self.save_settings()
+        await ctx.send(f"Reminder channel is now <#{channel_id}>. Saved to a json file for persistency.")
 
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def setremindertime(self, ctx, hours_before: int):
-
         if (hours_before < 1 or hours_before > 500):
             await ctx.send("Invalid reminder time. Must be int in [1, 500]")
             return
