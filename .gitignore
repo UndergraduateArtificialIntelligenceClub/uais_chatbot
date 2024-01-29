@@ -6,6 +6,7 @@ __pycache__/
 # Google calendar stuff
 credentials.json
 token.json
+reminderchannel.json
 
 # C extensions
 *.so
