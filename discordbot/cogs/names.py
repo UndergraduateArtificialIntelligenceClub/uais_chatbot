@@ -5,7 +5,7 @@ import discord
 class Names(commands.Cog):
     def __init__(self, bot):
         self.bot = bot    
-    
+
     @commands.command(brief='List the names of all categories in the server', aliases= ['list_cat', 'cat_names'])
     @commands.has_permissions(administrator=True)
     async def category_names(self, ctx):
@@ -13,10 +13,47 @@ class Names(commands.Cog):
         category_names = [category.name for category in guild.categories]
         cat_str = "\n".join(category_names)
         await ctx.send(f"Category names in the server: \n```\n{cat_str}\n```")
+
+    @commands.command(brief='Lists all names of channels in a category', aliases=['list_cat_channels'])
+    @commands.has_permissions(administrator=True)
+    async def cat_channel_names(self, ctx, *, category_name=None):
+        guild = ctx.guild
+
+        if category_name is None:
+            await ctx.send('You did not specify a category name.')
+            return
+
+        category = discord.utils.get(guild.categories, name=category_name)
+
+        if category is None:
+            await ctx.send(f"The category '{category_name}' does not exist.")
+            return
+
+        channel_names = [channel.name for channel in category.channels]
+
+        if channel_names:
+            await ctx.send(f"Channels in the category '{category_name}':")
+            await ctx.send('\n'.join(channel_names))
+        else:
+            await ctx.send(f"There are no channels in the category '{category_name}'.")
+
+    @commands.command(brief='Lists all channels not in a category', aliases=['list_extra_channels'])
+    @commands.has_permissions(administrator=True)
+    async def extra_names(self, ctx):
+        guild = ctx.guild
+
+        uncategorized_channels = [channel.name for channel in guild.channels if not channel.category]
+
+        if uncategorized_channels:
+            await ctx.send("Channels not in any category:")
+            await ctx.send('\n'.join(uncategorized_channels))
+        else:
+            await ctx.send("There are no channels not in any category.")
+
     
     @commands.command(brief='List the names of all roles in the server', aliases= ['roles'])
     @commands.has_permissions(administrator=True)
-    async def category_names(self, ctx):
+    async def role_names(self, ctx):
         guild = ctx.guild
         roles = guild.roles
 
