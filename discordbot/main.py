@@ -21,16 +21,10 @@ async def on_ready():
 
 
 # Comment out cogs you do not need during development
-# Comment out cogs you do not need during development
 async def load_extensions():
     await bot.load_extension(f"cogs.faq")
     await bot.load_extension(f"cogs.auditlogs")
     # await bot.load_extension(f"cogs.googlecalendar")
-
-async def reload(ctx):
-    # Reloads the file, thus updating the Cog class.
-    bot.reload_extension("cogs.tracking")
-
 
 async def main():
     async with bot:

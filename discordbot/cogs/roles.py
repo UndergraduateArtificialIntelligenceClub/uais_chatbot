@@ -1,5 +1,6 @@
 
 import discord
+import asyncio
 from discord.ext import commands
 
 intents = discord.Intents.default()
@@ -14,53 +15,108 @@ class RoleCommand(commands.Cog):
         self.roles_data = []
         self.msg_id = None
 
-    @commands.command(brief='gets user to add a role assignment message', aliases=['rr'])
+    @commands.command(brief='gets user to add a role assignment message', aliases=['rr', 'reactionroles'])
     @commands.has_permissions(administrator=True)
     async def reactionrole(self, ctx):
         if self.roles_data != []:
             self.roles_data = []
-            
-        #Get channel id 
+
+        # Get channel ID from admin
         await ctx.send("Copy and paste the channel ID of the channel you would like to send your reaction message to.")
-        channel_id = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel)
-        channel_id = int(channel_id.content)
+   
+        try:
+            channel_id = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
+            channel_id = int(channel_id.content)
+            channel = discord.utils.get(ctx.guild.channels, id=channel_id)
 
+            if channel == None:
+                await ctx.send("Invalid channel ID. Please try again.")
+                return
+            
+        except asyncio.TimeoutError:
+            await ctx.send("Timed out. Command will exit now.")
+            return
+        
         channel = self.bot.get_channel(channel_id)
-        if not channel:
-            return await ctx.send("Invalid channel. Please try again.")
 
-         #Get role reaction message content
-        await ctx.send("Insert the role message you would like to send.")
-        msg_input = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel)
-        msg_input = msg_input.content
+        # Get role reaction message content from admin
+        while True:
+            try:
+                await ctx.send("Insert the role message you would like to send.")
+                msg_input = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=30)
+                msg_input = msg_input.content
 
-        #Get role emoji and role names
-        await ctx.send("Now we input the role emoji and role names. You will be asked to input an emoji for users to react to, following the role name to use/create. When finished, type 'done'.")
+                # Give preview for admin to continue or redo message
+                await ctx.send(f"Preview: \n\n{msg_input}\n\nType 'r' to redo message, 'c' to continue.")
+
+                check = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=30)
+                check = check.content.lower()
+
+                if check == "r":
+                    await ctx.send("Redoing role message...\n")
+                elif check == "c":
+                    await ctx.send("Continuing...")
+                    break
+                else:
+                    await ctx.send("Invalid input. Please try again.\n")
+
+            except asyncio.TimeoutError:
+                await ctx.send("Timed out. Please try again.")
+                return
+
+        # Get role emoji and role names from admin
+        await ctx.send("For adding roles, input the emoji, followed by a '-', followed by the role name. An example:\n\n:smile: - Smile Role\n\n")
 
         while True:
-            await ctx.send("Input emoji or type 'done' if done:")
-            emoji_input = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel)
-            emoji_input = emoji_input.content
+            try:
+                await ctx.send("Input your emoji and role name, or type 'done' if done.")
+                user_input = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
+                user_input = user_input.content
 
-            if emoji_input.lower() == 'done':
-                break
+                if user_input.lower() == "done":
+                    break
+                elif "-" not in user_input:
+                    await ctx.send("Invalid input. Be sure to include a '-' in your input. Please try again.")
+                else:
+                    # Split input into emoji and role name
+                    emoji, role_name = user_input.split('-', 1)
+                    emoji = emoji.strip()
+                    role_name = role_name.strip()
 
-            await ctx.send("Input role name:")
-            role_name_input = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel)
-            role_name_input = role_name_input.content
+                    if emoji == None:
+                        await ctx.send("Invalid emoji. Please try again.")
+                    else:
+                        role = discord.utils.get(ctx.guild.roles, name=role_name)
+                        if not role:
+                            role = await ctx.guild.create_role(name=role_name)
+                        
+                        original_roles_data = self.roles_data.copy() # Roles without new one in case user wants to redo
 
-            role = discord.utils.get(ctx.guild.roles, name=role_name_input)
-            if not role:
-                try:
-                    role = await ctx.guild.create_role(name=role_name_input)
-                except discord.Forbidden:
-                    return await ctx.send("I don't have the permissions to create roles.")
+                        self.roles_data.append({
+                            "emoji": emoji,
+                            "role_name": role_name
+                        })
 
-            self.roles_data.append({
-                "emoji": emoji_input,
-                "role_name": role_name_input
-             })
+                        # Give preview for admin to continue or redo message
+                        while True:
+                            await ctx.send(f"Preview:\n{emoji} = {role_name}\nType 'r' to redo, 'c' to continue.")
+                            undo = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
+                            undo = undo.content.lower()
+                            if undo == "r":
+                                await ctx.send("Redoing...\n")
+                                self.roles_data = original_roles_data
+                                break
+                            elif undo == "c":
+                                await ctx.send("Continuing...")
+                                break
+                            else:
+                                await ctx.send("Invalid input. Please try again.\n")
 
+            except asyncio.TimeoutError:
+                await ctx.send("Timed out. Please try again.")
+                return
+
+        # Send reaction role message to channel
         message_content = f"{msg_input}\n"
         for role_data in self.roles_data:
             message_content += f"{role_data['emoji']} = {role_data['role_name']}\n"
@@ -105,7 +161,6 @@ class RoleCommand(commands.Cog):
    
                 
 async def setup(bot):
-    #await bot.add_cog(ReactionRoleAssign(bot))
     await bot.add_cog(RoleCommand(bot))
 
 
