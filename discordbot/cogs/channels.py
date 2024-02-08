@@ -2,15 +2,12 @@ from discord.ext import commands
 import discord
 from asyncio import TimeoutError
 
-### TODO: clean up delete function, change command aliases, redo bot end messages, maybe make a new cog file for member name listing, add ability to specify category for creating individual text/voice channels
-"""Create categories for channels, and try do for different channels like voice vs text"""
-
 class Channels(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(brief='Makes a new text or voice channel', aliases=['create_channel'])
+    @commands.command(brief='Makes a new category, text channel or voice channel', aliases=['create_channel'])
     @commands.has_permissions(administrator=True)
     async def create(self, ctx, type, *, name=None):
         guild = ctx.guild
@@ -68,35 +65,56 @@ class Channels(commands.Cog):
 
     @commands.command(brief='Deletes a channel', aliases=['del'])
     @commands.has_permissions(administrator=True)
-    async def delete(self, ctx, name=None):
+    async def delete(self, ctx, type, *, name=None):
         guild = ctx.guild
+        if type.lower() not in ['team','cat','channel','category']:
+            await ctx.send("Invalid type, use 'category' or 'channel'. Please try again: `!delete ['channel' or 'category'] [channel/category name]`")
+            return
+        
         if name is None:
-            await ctx.send('You did not provide a name for the channel to delete. Please try again: `!delete [channel name]`')
+            await ctx.send('You did not provide a name for the channel/category to delete. Please try again: `!delete ["channel" or "category"] [channel/category name]`')
             return
 
-        await ctx.send("Is this channel within a category? If yes, please specify the category name, otherwise type 'n'")
-        category_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
-        if category_name.content.lower() == 'n':
-            category = None
-        else:
-            category = discord.utils.get(ctx.guild.categories, name=category_name.content)
-            if category is None:
-                await ctx.send("Invalid category name. Please try the command again.")
-                return
-        
-        channel = discord.utils.get(category.channels if category else guild.channels, name=name)
-        if channel is not None:
-            await channel.delete()
-            await ctx.send(f"Deleted a channel named {name}")
-        else:
-            await ctx.send(f"Channel '{name}' does not exist.")
+        if type.lower() in ["team","cat", "category"]:
+            category = discord.utils.get(guild.categories, name=name)
+
+            if category:
+                for channel in category.channels:
+                    await channel.delete()
+
+                await category.delete()
+
+                await ctx.send(f"Category '{name}' and all channels within it have been deleted.")
+            else:
+                await ctx.send(f"Category '{name}' not found.")
             
+        else:
+            await ctx.send("Is this channel within a category? If yes, please specify the category name, otherwise type 'n'")
+            category_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
+            if category_name.content.lower() == 'n':
+                category = None
+            else:
+                category = discord.utils.get(ctx.guild.categories, name=category_name.content)
+                if category is None:
+                    await ctx.send("Invalid category name. Please try the command again.")
+                    return
+            
+            channel = discord.utils.get(category.channels if category else guild.channels, name=name)
+            if channel is not None:
+                await channel.delete()
+                await ctx.send(f"Deleted a channel named {name}")
+            else:
+                await ctx.send(f"Channel '{name}' does not exist.")
+                
     
     @commands.command(brief='Create or delete a team category and associated channels', aliases=[])
     @commands.has_permissions(administrator=True)
     async def team(self, ctx, action, *, name=None):
         guild = ctx.guild
 
+        if action.lower() not in ['create', 'delete','del']:
+            await ctx.send('Invalid action. Please try again: `!team create [team name]` or `!team delete [team name]`')
+            return
         if name is None:
             await ctx.send('You did not include a name for your team. Please try again: `!team create [team name]` or `!team delete [team name]`')
             return
