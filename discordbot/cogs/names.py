@@ -42,13 +42,13 @@ class Names(commands.Cog):
     async def extra_names(self, ctx):
         guild = ctx.guild
 
-        uncategorized_channels = [channel.name for channel in guild.channels if not channel.category]
+        uncategorized_channels = [channel.name for channel in guild.channels if not channel.category and isinstance(channel, (discord.TextChannel, discord.VoiceChannel))]
 
         if uncategorized_channels:
-            await ctx.send("Channels not in any category:")
+            await ctx.send("Text and voice channels not in any category:")
             await ctx.send('\n'.join(uncategorized_channels))
         else:
-            await ctx.send("There are no channels not in any category.")
+            await ctx.send("There are no text and voice channels not in any category.")
 
     
     @commands.command(brief='List the names of all roles in the server', aliases= ['roles'])
