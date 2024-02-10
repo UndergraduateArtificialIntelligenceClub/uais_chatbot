@@ -43,7 +43,6 @@ class Admin(commands.Cog):
     @commands.is_owner()
     async def list_cogs(self, ctx):
         msg = 'List of cogs:'
-        print(os.listdir('discordbot/cogs'))
         for entry in os.listdir('discordbot/cogs'):
             # TODO: Could add a check to see if the file contains a cog class
             if entry.endswith('.py'):
