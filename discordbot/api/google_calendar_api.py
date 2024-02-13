@@ -58,7 +58,7 @@ class GoogleCalendarAPI:
                     timeMin=now,
                     maxResults=max_results,
                     singleEvents=True,
-                    orderBy="startTime",
+                    orderBy="startTime"
                 )
                 .execute()
             )
@@ -69,15 +69,44 @@ class GoogleCalendarAPI:
         except HttpError as error:
             return f"An error occured: {error}"
 
-    def create_event(self, summary, location, description, start_time: datetime, end_time: datetime, tags: list = None):
+    def get_remindable_events(self):
+        try:
+            # Call the Calendar API
+            now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+
+            # Getting the upcoming max_results events
+            events_result = (
+                self.service.events()
+                .list(
+                    calendarId="primary",
+                    timeMin=now,
+                    singleEvents=True,
+                    orderBy="startTime",
+                    privateExtendedProperty="remindable=true"
+                )
+                .execute()
+            )
+            events = events_result.get("items", [])
+
+            return events
+
+        except HttpError as error:
+            return f"An error occured: {error}"
+
+    def create_event(self, summary, location, description, start_time: datetime, end_time: datetime, roles: list = None, mins_before_reminder: list = None):
         # Example arguments:
         # Test event, University of Alberta, Description, datetime start time, datetime end time, ["tag1"]
 
         if not summary or not start_time or not end_time:
             return None
 
-        # Convert tags list to a JSON string
-        tags_json = json.dumps(tags) if tags is not None else ''
+        # Convert additional data to json
+        roles_json = json.dumps(roles) if roles is not None else ''
+        minutes_list_json = json.dumps(mins_before_reminder) if mins_before_reminder is not None else ''
+        remindable = "true" if mins_before_reminder is not None else 'false'
+
+        # mins_before_reminder is a list of integers which represent minutes
+        # mins_before_reminder = [60, 30, 15] means: remind about this event 60 minutes before it happens, 30, 15 minutes.
 
         event = {
             'summary': summary,
@@ -100,7 +129,9 @@ class GoogleCalendarAPI:
             },
             'extendedProperties': {
                 'private': {
-                    'tags': tags_json  # Additional info to store with event
+                    'roles': roles_json,  # Roles to remind
+                    'reminderMinutes': minutes_list_json,
+                    'remindable': remindable
                 }
             }
         }
