@@ -1,12 +1,13 @@
-import os
 import json
+import os
+from datetime import datetime
+
+from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from datetime import datetime
-from dotenv import load_dotenv
 
 load_dotenv()
 TIMEZONE = os.environ['TIMEZONE']
@@ -15,6 +16,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 class GoogleCalendarAPI:
+
     def __init__(self):
         self.service = self.initialize_service()
 
@@ -47,7 +49,6 @@ class GoogleCalendarAPI:
 
     def get_events(self, max_results=10):
         try:
-            # Call the Calendar API
             now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
 
             # Getting the upcoming max_results events
@@ -71,10 +72,9 @@ class GoogleCalendarAPI:
 
     def get_remindable_events(self):
         try:
-            # Call the Calendar API
-            now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+            now = datetime.utcnow().isoformat() + "Z"
 
-            # Getting the upcoming max_results events
+            # Getting all remindable events
             events_result = (
                 self.service.events()
                 .list(
@@ -95,10 +95,10 @@ class GoogleCalendarAPI:
 
     def create_event(self, summary, location, description, start_time: datetime, end_time: datetime, roles: list = None, mins_before_reminder: list = None):
         # Example arguments:
-        # Test event, University of Alberta, Description, datetime start time, datetime end time, ["tag1"]
+        # Test event, University of Alberta, Description, datetime start time, datetime end time, ["role1"], [120, 60, 30, 5]
 
         if not summary or not start_time or not end_time:
-            return None
+            return "Error: Cannot create event without summary, start_time or end_time"
 
         # Convert additional data to json
         roles_json = json.dumps(roles) if roles is not None else ''

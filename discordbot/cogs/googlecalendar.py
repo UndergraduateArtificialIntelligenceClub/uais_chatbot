@@ -1,21 +1,21 @@
-import os
 import json
-import pytz
+import os
+from datetime import datetime, timedelta
+
 import discord
+import pytz
+from discord.ext import commands, tasks
+from dotenv import load_dotenv
+
 from api.google_calendar_api import GoogleCalendarAPI
 from views.event_creation_view import EventCreationView
-from discord.ext import commands, tasks
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
 
 load_dotenv()
 TIMEZONE = os.environ['TIMEZONE']
 
 
 def get_event_mentions(event, guild: discord.Guild):
-    # Get roles, if available (stored in tags property)
-    roles_json = event.get('extendedProperties', {}).get(
-        'private', {}).get('roles', '')
+    roles_json = event.get('extendedProperties', {}).get('private', {}).get('roles', '')
     roles = json.loads(roles_json) if roles_json else None
 
     if roles is None:
@@ -32,8 +32,7 @@ def get_reminder_embed(event, start_dt: datetime):
     description = event.get('description')
     location = event.get('location')
 
-    start_formatted = start_dt.strftime(
-        "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+    start_formatted = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
     now = datetime.now(start_dt.tzinfo)
     time_diff = start_dt - now
@@ -46,13 +45,14 @@ def get_reminder_embed(event, start_dt: datetime):
 
     if hrs_left == 0:
         title = f"Reminder:\n**{summary}** starts in **{mins_left}** {minutes}!"
+    elif mins_left == 0:
+        title = f"Reminder:\n**{summary}** starts in **{hrs_left}** {hours}!"
     else:
         title = f"Reminder:\n**{summary}** starts in **{hrs_left}** {hours} **{mins_left}** {minutes}!"
 
     embed = discord.Embed(title=title, color=discord.Color.random())
 
-    embed.add_field(name="Start time:",
-                    value=f"**{start_formatted}**", inline=False)
+    embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
 
     if description:
         embed.add_field(name="Description:", value=description, inline=False)
@@ -70,7 +70,7 @@ class Calendar(commands.Cog):
         self.active_menus = set()
         # Set this via a command
         self.reminder_channel_id = None
-        # Remembering values above
+        # Remembering value above
         self.settings_file = 'reminderchannel.json'
         self.load_settings()
         self.event_reminders.start()
@@ -97,7 +97,6 @@ class Calendar(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def event_reminders(self):
-
         reminder_channel = self.bot.get_channel(self.reminder_channel_id)
         if reminder_channel is None:
             return
@@ -118,16 +117,18 @@ class Calendar(commands.Cog):
 
             for minute_offset in minute_offsets:
                 reminder_time = start - timedelta(minutes=minute_offset)
+
                 # Check if 'now' is within 1 minute of the reminder time
                 if 0 <= (reminder_time - now).total_seconds() < 60:
-                    await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild), embed=get_reminder_embed(event, start))
+                    await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild),
+                                                embed=get_reminder_embed(event, start))
                     break
 
     @event_reminders.before_loop
     async def before_event_reminders(self):
         await self.bot.wait_until_ready()
 
-    @commands.command()
+    @commands.command(brief='Call with 1 argument: channel id')
     @commands.has_permissions(administrator=True)
     async def setreminderchannel(self, ctx, channel_id: int):
         channel = self.bot.get_channel(channel_id)
@@ -139,20 +140,9 @@ class Calendar(commands.Cog):
         self.save_settings()
         await ctx.send(f"Reminder channel is now <#{channel_id}>. Saved to a json file for persistency.")
 
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def setremindertime(self, ctx, hours_before: int):
-        if (hours_before < 1 or hours_before > 500):
-            await ctx.send("Invalid reminder time. Must be int in [1, 500]")
-            return
-
-        self.reminder_time_before = timedelta(hours=hours_before)
-        await ctx.send(f"Reminders will be sent {hours_before} hours before events.")
-
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     @commands.has_permissions(administrator=True)
     async def plan(self, ctx):
-        # Check if the user already has an active menu
         if ctx.author.id in self.active_menus:
             await ctx.send("You already have an active event creation menu.")
             return
@@ -161,7 +151,6 @@ class Calendar(commands.Cog):
         event_creation_view = EventCreationView(user=ctx.author)
         msg = await ctx.send(content="**Event creation menu:**", view=event_creation_view)
 
-        # Add the user to the set of active menus
         self.active_menus.add(ctx.author.id)
 
         # Wait until it finishes execution and notify user if it times out
@@ -183,39 +172,7 @@ class Calendar(commands.Cog):
 
         await ctx.send(content=response)
 
-    @commands.command(brief='Plans an event from one text command call. Call without arguments to see format', aliases=['plc', 'planc', 'plcli'])
-    @commands.has_permissions(administrator=True)
-    async def plancli(self, ctx, *, payload=""):
-        if not payload:
-            line_1 = r'!plancli Summary;Location;Description;Start time: %d/%m/%Y %H:%M:%S;End time: %d/%m/%Y %H:%M:%S;role1, role2, ...'
-            line_2 = '!plancli Test event;University of Alberta;Description;20/11/2024 09:15:30;20/11/2024 10:00:00; role1, role2'
-
-            await ctx.send(content=line_1+"\ne.g.\n"+line_2)
-            return
-
-        argument_list = payload.split(';')
-
-        if (len(argument_list) != 5) and (len(argument_list) != 6):
-            await ctx.send(content="Invalid number of arguments. Call !plancli without arguments to see proper format example")
-            return
-
-        tags = argument_list[5].strip().split(
-            ',') if len(argument_list) > 5 else None
-
-        try:
-            start_time = datetime.strptime(
-                argument_list[3], "%d/%m/%Y %H:%M:%S")
-            end_time = datetime.strptime(argument_list[4], "%d/%m/%Y %H:%M:%S")
-        except ValueError:
-            await ctx.send(content="Could not convert start_time or end_time to datetime object")
-            return
-
-        response = self.google_calendar.create_event(
-            argument_list[0], argument_list[1], argument_list[2], start_time, end_time, tags)
-
-        await ctx.send(content=response)
-
-    @commands.command(brief='Lists 10 (or specified number of) upcoming Google Calendar events', aliases=['calendar', 'ev'])
+    @commands.command(brief='Lists 10 (or specified number of) upcoming events', aliases=['calendar', 'ev'])
     async def events(self, ctx, events_num=10):
         if (events_num < 1) or (events_num > 30):
             await ctx.send(content="Invalid number of events provided. Must be int and in [1, 30]")
@@ -233,8 +190,7 @@ class Calendar(commands.Cog):
 
             # Convert to human readable format
             start_dt = datetime.fromisoformat(start)
-            formatted_start = start_dt.strftime(
-                "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+            formatted_start = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
             output += f"**{formatted_start}:** {event['summary']}\n"
 
