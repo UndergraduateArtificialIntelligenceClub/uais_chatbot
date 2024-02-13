@@ -15,7 +15,7 @@ TIMEZONE = os.environ['TIMEZONE']
 def get_event_mentions(event, guild: discord.Guild):
     # Get roles, if available (stored in tags property)
     roles_json = event.get('extendedProperties', {}).get(
-        'private', {}).get('tags', '')
+        'private', {}).get('roles', '')
     roles = json.loads(roles_json) if roles_json else None
 
     if roles is None:
@@ -51,7 +51,8 @@ def get_reminder_embed(event, start_dt: datetime):
 
     embed = discord.Embed(title=title, color=discord.Color.random())
 
-    embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
+    embed.add_field(name="Start time:",
+                    value=f"**{start_formatted}**", inline=False)
 
     if description:
         embed.add_field(name="Description:", value=description, inline=False)
@@ -69,11 +70,9 @@ class Calendar(commands.Cog):
         self.active_menus = set()
         # Set this via a command
         self.reminder_channel_id = None
-        # Remembering values above 
+        # Remembering values above
         self.settings_file = 'reminderchannel.json'
         self.load_settings()
-        self.reminder_time_before = timedelta(hours=5)
-        self.reminded_events = set()
         self.event_reminders.start()
 
     def cog_unload(self):
@@ -103,21 +102,26 @@ class Calendar(commands.Cog):
         if reminder_channel is None:
             return
 
-        upcoming_events = self.google_calendar.get_events(10)
-        if not upcoming_events:
+        remindable_events = self.google_calendar.get_remindable_events()
+        if not remindable_events:
             return
 
         now = datetime.now(pytz.timezone(TIMEZONE))
 
-        for event in upcoming_events:
-            start_iso = event["start"].get(
-                "dateTime", event["start"].get("date"))
+        for event in remindable_events:
+            start_iso = event["start"].get("dateTime", event["start"].get("date"))
             start = datetime.fromisoformat(start_iso)
-            id = event.get("id")
 
-            if id not in self.reminded_events and now + self.reminder_time_before >= start:
-                self.reminded_events.add(id)
-                await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild), embed=get_reminder_embed(event, start))
+            minute_offsets_json = event.get('extendedProperties', {}).get(
+                'private', {}).get('reminderMinutes', '')
+            minute_offsets = json.loads(minute_offsets_json)
+
+            for minute_offset in minute_offsets:
+                reminder_time = start - timedelta(minutes=minute_offset)
+                # Check if 'now' is within 1 minute of the reminder time
+                if 0 <= (reminder_time - now).total_seconds() < 60:
+                    await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild), embed=get_reminder_embed(event, start))
+                    break
 
     @event_reminders.before_loop
     async def before_event_reminders(self):
@@ -171,9 +175,11 @@ class Calendar(commands.Cog):
         # Get event data
         event_data = event_creation_view.event_data
         roles_to_remind = event_creation_view.selected_roles
+        offsets = event_creation_view.minute_offsets
 
         response = self.google_calendar.create_event(event_data.get("summary"), event_data.get("location"),
-                                                     event_data.get("description"), event_data.get("start_time"), event_data.get("end_time"), tags=roles_to_remind)
+                                                     event_data.get("description"), event_data.get("start_time"),
+                                                     event_data.get("end_time"), roles=roles_to_remind, mins_before_reminder=offsets)
 
         await ctx.send(content=response)
 
