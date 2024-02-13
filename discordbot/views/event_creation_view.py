@@ -132,6 +132,20 @@ def return_valid_duration(duration: str):
     return duration_minutes if duration_minutes > 0 else False
 
 
+select_offsets = [
+            discord.SelectOption(label="1 week before", value="10080"),  # 168 hours * 60 minutes
+            discord.SelectOption(label="3 days before", value="4320"),   # 72 hours * 60 minutes
+            discord.SelectOption(label="1 day before", value="1440"),    # 24 hours * 60 minutes
+            discord.SelectOption(label="12 hours before", value="720"),  # 12 hours * 60 minutes
+            discord.SelectOption(label="6 hours before", value="360"),   # 6 hours * 60 minutes
+            discord.SelectOption(label="3 hours before", value="180"),   # 3 hours * 60 minutes
+            discord.SelectOption(label="1 hour before", value="60"),     # 1 hour * 60 minutes
+            discord.SelectOption(label="30 minutes before", value="30"), # 30 minutes
+            discord.SelectOption(label="15 minutes before", value="15"), # 15 minutes
+            discord.SelectOption(label="5 minutes before", value="5"),   # 5 minutes
+        ]
+
+
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
@@ -150,6 +164,7 @@ class EventCreationView(discord.ui.View):
             "end_time": ""
         }
         self.selected_roles = None
+        self.minute_offsets = None
         self.name_modal_submitted = False
         self.date_modal_submitted = False
 
@@ -282,3 +297,8 @@ class EventCreationView(discord.ui.View):
     async def select_roles(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
         self.selected_roles = [role.name for role in select.values]
         await interaction.response.edit_message(view=self, content=f'**You selected roles:** {", ".join(self.selected_roles)}')
+
+    @discord.ui.select(cls=discord.ui.Select, placeholder='When to send reminder', options=select_offsets, min_values=0, max_values=10, row=2)
+    async def select_remind_times(self, interaction: discord.Interaction, select: discord.ui.Select):
+        self.minute_offsets = [int(value) for value in select.values]
+        await interaction.response.edit_message(view=self, content=f'**You selected offsets (in minutes):** {", ".join(select.values)}')
