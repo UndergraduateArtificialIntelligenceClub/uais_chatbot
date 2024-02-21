@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from api.google_calendar_api import GoogleCalendarAPI
 from views.event_creation_view import EventCreationView
+from views.default_reminders_view import DefaultRemindersView
 
 load_dotenv()
 TIMEZONE = os.environ['TIMEZONE']
@@ -144,6 +145,25 @@ class Calendar(commands.Cog):
         self.reminder_channel_id = channel_id
         self.save_settings()
         await ctx.send(f"Reminder channel is now <#{channel_id}>. Saved to a json file for persistency.")
+
+    @commands.command(brief='Set default times to remind about an event')
+    @commands.has_permissions(administrator=True)
+    async def setdefaultremindtimes(self, ctx):
+        default_reminders_view = DefaultRemindersView(user=ctx.author)
+        msg = await ctx.send(content="**Select default remind times:**", view=default_reminders_view)
+
+        if await default_reminders_view.wait():
+            await msg.edit(content="Default reminders menu timed out.", view=None)
+            return
+
+        minute_offsets = default_reminders_view.minute_offsets
+
+        if minute_offsets is not None:
+            self.default_reminders_mins = minute_offsets
+            self.save_settings()
+            await ctx.send(content="Default reminders saved.")
+        else:
+            logging.error(f"User selected default reminder values in DefaultRemindersView, the view returned None for the selected values")
 
     @commands.command(brief='Opens event creation menu', aliases=['pl'])
     @commands.has_permissions(administrator=True)

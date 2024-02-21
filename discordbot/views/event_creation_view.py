@@ -133,16 +133,16 @@ def return_valid_duration(duration: str):
 
 
 select_offsets = [
-            discord.SelectOption(label="1 week before", value="10080"),  # 168 hours * 60 minutes
-            discord.SelectOption(label="3 days before", value="4320"),   # 72 hours * 60 minutes
-            discord.SelectOption(label="1 day before", value="1440"),    # 24 hours * 60 minutes
-            discord.SelectOption(label="12 hours before", value="720"),  # 12 hours * 60 minutes
-            discord.SelectOption(label="6 hours before", value="360"),   # 6 hours * 60 minutes
-            discord.SelectOption(label="3 hours before", value="180"),   # 3 hours * 60 minutes
-            discord.SelectOption(label="1 hour before", value="60"),     # 1 hour * 60 minutes
-            discord.SelectOption(label="30 minutes before", value="30"), # 30 minutes
-            discord.SelectOption(label="15 minutes before", value="15"), # 15 minutes
-            discord.SelectOption(label="5 minutes before", value="5"),   # 5 minutes
+            discord.SelectOption(label="1 week before", value="10080"),
+            discord.SelectOption(label="3 days before", value="4320"),
+            discord.SelectOption(label="1 day before", value="1440"),
+            discord.SelectOption(label="12 hours before", value="720"),
+            discord.SelectOption(label="6 hours before", value="360"),
+            discord.SelectOption(label="3 hours before", value="180"),
+            discord.SelectOption(label="1 hour before", value="60"),
+            discord.SelectOption(label="30 minutes before", value="30"),
+            discord.SelectOption(label="15 minutes before", value="15"),
+            discord.SelectOption(label="5 minutes before", value="5"),
         ]
 
 
@@ -298,7 +298,7 @@ class EventCreationView(discord.ui.View):
         self.selected_roles = [role.name for role in select.values]
         await interaction.response.edit_message(view=self, content=f'**You selected roles:** {", ".join(self.selected_roles)}')
 
-    @discord.ui.select(cls=discord.ui.Select, placeholder='When to send reminder', options=select_offsets, min_values=0, max_values=10, row=2)
+    @discord.ui.select(cls=discord.ui.Select, placeholder='Custom remind times (default if not picked)', options=select_offsets, min_values=0, max_values=10, row=2)
     async def select_remind_times(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.minute_offsets = [int(value) for value in select.values]
         await interaction.response.edit_message(view=self, content=f'**You selected offsets (in minutes):** {", ".join(select.values)}')
