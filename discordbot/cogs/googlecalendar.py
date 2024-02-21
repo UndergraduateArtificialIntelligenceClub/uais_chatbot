@@ -1,12 +1,11 @@
 import json
 import os
-from datetime import datetime, timedelta
-
+import logging
 import discord
-import pytz
+from datetime import datetime, timedelta
 from discord.ext import commands, tasks
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-
 from api.google_calendar_api import GoogleCalendarAPI
 from views.event_creation_view import EventCreationView
 
@@ -52,7 +51,7 @@ def get_reminder_embed(event, start_dt: datetime):
 
     embed = discord.Embed(title=title, color=discord.Color.random())
 
-    embed.add_field(name="Start time:", value=f"**{start_formatted}**", inline=False)
+    embed.add_field(name="Start time:",value=f"**{start_formatted}**", inline=False)
 
     if description:
         embed.add_field(name="Description:", value=description, inline=False)
@@ -68,64 +67,70 @@ class Calendar(commands.Cog):
         self.bot = bot
         self.google_calendar = GoogleCalendarAPI()
         self.active_menus = set()
-        # Set this via a command
+        self.scheduled_events = set()
         self.reminder_channel_id = None
-        # Remembering value above
+        self.default_reminders_mins = [1440, 180, 15]
         self.settings_file = 'reminderchannel.json'
         self.load_settings()
-        self.event_reminders.start()
+        self.scheduler = AsyncIOScheduler()
+        self.scheduler.start()
+        self.schedule_reminders.start()
 
     def cog_unload(self):
-        self.event_reminders.cancel()
+        self.scheduler.shutdown(wait=False)
+        self.schedule_reminders.cancel()
 
     def load_settings(self):
         try:
             with open(self.settings_file, 'r') as f:
                 settings = json.load(f)
-                channel_id = settings.get('reminder_channel_id')
-                self.reminder_channel_id = channel_id
+                self.reminder_channel_id = settings.get('reminder_channel_id')
+                default_reminders_mins_json = settings.get('default_reminders_mins')
+                self.default_reminders_mins = json.loads(default_reminders_mins_json)
         except FileNotFoundError:
             self.save_settings()  # Create the file if it doesn't exist
-            return
 
     def save_settings(self):
         settings = {
             'reminder_channel_id': self.reminder_channel_id,
+            'default_reminders_mins': json.dumps(self.default_reminders_mins)
         }
         with open(self.settings_file, 'w') as f:
             json.dump(settings, f, indent=4)
 
-    @tasks.loop(minutes=1)
-    async def event_reminders(self):
+    def schedule_event_reminder(self, event):
+        start_iso = event["start"].get("dateTime", event["start"].get("date"))
+        start = datetime.fromisoformat(start_iso)
+
+        minute_offsets_json = event.get('extendedProperties', {}).get('private', {}).get('reminderMinutes', '')
+        minute_offsets = json.loads(minute_offsets_json) if minute_offsets_json else self.default_reminders_mins
+
+        for minute_offset in minute_offsets:
+            reminder_time = start - timedelta(minutes=minute_offset)
+            self.scheduler.add_job(self.send_reminder, 'date', run_date=reminder_time, args=[
+                                   event, start], misfire_grace_time=300)
+
+    async def send_reminder(self, event, start):
         reminder_channel = self.bot.get_channel(self.reminder_channel_id)
         if reminder_channel is None:
+            logging.error(f'Failed to send reminder for event {event.get("id")} - the reminder channel could not be accessed')
             return
 
-        remindable_events = self.google_calendar.get_remindable_events()
-        if not remindable_events:
-            return
+        await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild), embed=get_reminder_embed(event, start))
 
-        now = datetime.now(pytz.timezone(TIMEZONE))
+    @tasks.loop(hours=1)
+    async def schedule_reminders(self):
+        custom_reminders = self.google_calendar.get_events(max_results=None, custom_reminders=True)
+        default_reminders = self.google_calendar.get_events(max_results=15)
 
-        for event in remindable_events:
-            start_iso = event["start"].get("dateTime", event["start"].get("date"))
-            start = datetime.fromisoformat(start_iso)
+        for event in custom_reminders + default_reminders:
+            event_id = event.get('id')
+            if event_id not in self.scheduled_events:
+                self.schedule_event_reminder(event)
+                self.scheduled_events.add(event_id)
 
-            minute_offsets_json = event.get('extendedProperties', {}).get(
-                'private', {}).get('reminderMinutes', '')
-            minute_offsets = json.loads(minute_offsets_json)
-
-            for minute_offset in minute_offsets:
-                reminder_time = start - timedelta(minutes=minute_offset)
-
-                # Check if 'now' is within 1 minute of the reminder time
-                if 0 <= (reminder_time - now).total_seconds() < 60:
-                    await reminder_channel.send(content=get_event_mentions(event, reminder_channel.guild),
-                                                embed=get_reminder_embed(event, start))
-                    break
-
-    @event_reminders.before_loop
-    async def before_event_reminders(self):
+    @schedule_reminders.before_loop
+    async def before_schedule_reminders(self):
         await self.bot.wait_until_ready()
 
     @commands.command(brief='Call with 1 argument: channel id')
