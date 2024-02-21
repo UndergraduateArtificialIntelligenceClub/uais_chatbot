@@ -35,7 +35,8 @@ def get_reminder_embed(event, start_dt: datetime):
     start_formatted = start_dt.strftime("%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
 
     now = datetime.now(start_dt.tzinfo)
-    time_diff = start_dt - now
+    # adding one minute so reminder doesn't say "event starts in 59 minutes, 29 minutes"
+    time_diff = start_dt - now + timedelta(minutes=1)
 
     hrs_left = int(time_diff.total_seconds() / 3600)
     hours = f"hour{'s' if hrs_left != 1 else ''}"
@@ -102,14 +103,20 @@ class Calendar(commands.Cog):
     def schedule_event_reminder(self, event):
         start_iso = event["start"].get("dateTime", event["start"].get("date"))
         start = datetime.fromisoformat(start_iso)
+        end_iso = event["end"].get("dateTime", event["end"].get("date"))
+        end = datetime.fromisoformat(end_iso)
+
+        self.scheduler.add_job(self.remove_event_from_scheduled, 'date', run_date=end, args=[event.get('id')], misfire_grace_time=300)
 
         minute_offsets_json = event.get('extendedProperties', {}).get('private', {}).get('reminderMinutes', '')
         minute_offsets = json.loads(minute_offsets_json) if minute_offsets_json else self.default_reminders_mins
 
         for minute_offset in minute_offsets:
             reminder_time = start - timedelta(minutes=minute_offset)
-            self.scheduler.add_job(self.send_reminder, 'date', run_date=reminder_time, args=[
-                                   event, start], misfire_grace_time=300)
+            self.scheduler.add_job(self.send_reminder, 'date', run_date=reminder_time, args=[event, start], misfire_grace_time=300)
+
+    def remove_event_from_scheduled(self, event_id):
+        self.scheduled_events.discard(event_id)
 
     async def send_reminder(self, event, start):
         reminder_channel = self.bot.get_channel(self.reminder_channel_id)
@@ -123,8 +130,11 @@ class Calendar(commands.Cog):
     async def schedule_reminders(self):
         custom_reminders = self.google_calendar.get_events(max_results=None, custom_reminders=True)
         default_reminders = self.google_calendar.get_events(max_results=15)
+        events = []
+        events += custom_reminders if custom_reminders is not None else []
+        events += default_reminders if default_reminders is not None else []
 
-        for event in custom_reminders + default_reminders:
+        for event in events:
             event_id = event.get('id')
             if event_id not in self.scheduled_events:
                 self.schedule_event_reminder(event)
