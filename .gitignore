@@ -8,6 +8,9 @@ credentials.json
 token.json
 reminderchannel.json
 
+# Logs
+bot_logs.txt
+
 # C extensions
 *.so
 
