@@ -1,5 +1,7 @@
+APScheduler==3.10.4
 discord.py==2.3.2
-python-dotenv==1.0.0
-google-api-python-client==2.108.0
-google-auth-httplib2==0.1.1
-google-auth-oauthlib==1.1.0
+google_api_python_client==2.118.0
+google_auth_oauthlib==1.2.0
+protobuf==4.25.3
+python-dotenv==1.0.1
+pytz==2024.1

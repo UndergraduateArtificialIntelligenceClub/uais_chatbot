@@ -14,21 +14,26 @@ class EventNamingModal(discord.ui.Modal, title="Name The Event"):
         style=discord.TextStyle.short,
         label="Title",
         required=True,
-        placeholder="Event Summary"
+        placeholder="Event Summary",
+        # This is 200 because a title of a reminder embed (in googlecalendar.py) can only be 256 characters
+        # And the format used for the title of the reminder embed is not just the summary
+        max_length=200
     )
 
     description = discord.ui.TextInput(
         style=discord.TextStyle.long,
         label="Description",
         required=False,
-        placeholder="Event Description (optional)"
+        placeholder="Event Description (optional)",
+        max_length=1024
     )
 
     location = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Location",
         required=False,
-        placeholder="Event Location (optional)"
+        placeholder="Event Location (optional)",
+        max_length=1024
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
@@ -127,6 +132,20 @@ def return_valid_duration(duration: str):
     return duration_minutes if duration_minutes > 0 else False
 
 
+select_offsets = [
+            discord.SelectOption(label="1 week before", value="10080"),
+            discord.SelectOption(label="3 days before", value="4320"),
+            discord.SelectOption(label="1 day before", value="1440"),
+            discord.SelectOption(label="12 hours before", value="720"),
+            discord.SelectOption(label="6 hours before", value="360"),
+            discord.SelectOption(label="3 hours before", value="180"),
+            discord.SelectOption(label="1 hour before", value="60"),
+            discord.SelectOption(label="30 minutes before", value="30"),
+            discord.SelectOption(label="15 minutes before", value="15"),
+            discord.SelectOption(label="5 minutes before", value="5"),
+        ]
+
+
 class EventCreationView(discord.ui.View):
 
     def __init__(self, user: discord.User):
@@ -144,6 +163,8 @@ class EventCreationView(discord.ui.View):
             "start_time": "",
             "end_time": ""
         }
+        self.selected_roles = None
+        self.minute_offsets = None
         self.name_modal_submitted = False
         self.date_modal_submitted = False
 
@@ -209,12 +230,12 @@ class EventCreationView(discord.ui.View):
             end_time = start_time + timedelta(minutes=duration_minutes)
 
             # Prepare event information
-            self.event_data["start_time"] = start_time.isoformat()
-            self.event_data["end_time"] = end_time.isoformat()
+            self.event_data["start_time"] = start_time
+            self.event_data["end_time"] = end_time
 
         return error_payload
 
-    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Set Title", emoji="✏️", style=discord.ButtonStyle.primary, row=0)
     async def set_title(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
         modal = EventNamingModal(
@@ -237,7 +258,7 @@ class EventCreationView(discord.ui.View):
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
-    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Set Date", emoji="📅", style=discord.ButtonStyle.primary, row=0)
     async def set_date(self, interaction: discord.Interaction, button: discord.ui.Button):
         # On click, create the modal and send it to the user
         modal = EventDateModal(
@@ -264,10 +285,20 @@ class EventCreationView(discord.ui.View):
         button.style = discord.ButtonStyle.gray
         await self.check_readiness(interaction)
 
-    @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True)
+    @discord.ui.button(label="Submit", emoji="✅", style=discord.ButtonStyle.grey, disabled=True, row=0)
     async def submit(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Clear items, respond to interaction, and stop
         self.clear_items()
         await interaction.response.defer()
         await interaction.delete_original_response()
         self.stop()
+
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder='Roles to ping', min_values=0, max_values=25, row=1)
+    async def select_roles(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
+        self.selected_roles = [role.name for role in select.values]
+        await interaction.response.edit_message(view=self, content=f'**You selected roles:** {", ".join(self.selected_roles)}')
+
+    @discord.ui.select(cls=discord.ui.Select, placeholder='Custom remind times (default if not picked)', options=select_offsets, min_values=0, max_values=10, row=2)
+    async def select_remind_times(self, interaction: discord.Interaction, select: discord.ui.Select):
+        self.minute_offsets = [int(value) for value in select.values]
+        await interaction.response.edit_message(view=self, content=f'**You selected offsets (in minutes):** {", ".join(select.values)}')
