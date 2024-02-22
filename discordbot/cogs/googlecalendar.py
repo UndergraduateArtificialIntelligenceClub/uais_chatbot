@@ -38,13 +38,16 @@ def get_reminder_embed(event, start_dt: datetime):
     # adding one minute so reminder doesn't say "event starts in 59 minutes, 29 minutes"
     time_diff = start_dt - now + timedelta(minutes=1)
 
-    hrs_left = int(time_diff.total_seconds() / 3600)
+    days_left = int(time_diff.total_seconds() / 86400)
+    days = f"day{'s' if days_left != 1 else ''}"
+    hrs_left = int(time_diff.total_seconds() / 3600) - (days_left * 24)
     hours = f"hour{'s' if hrs_left != 1 else ''}"
-
     mins_left = int(time_diff.total_seconds() / 60) - (hrs_left * 60)
     minutes = f"minute{'s' if mins_left != 1 else ''}"
 
-    if hrs_left == 0:
+    if days_left > 0:
+        title = f"Reminder:\n**{summary}** starts in **{days_left}** {days}!"
+    elif hrs_left == 0:
         title = f"Reminder:\n**{summary}** starts in **{mins_left}** {minutes}!"
     elif mins_left == 0:
         title = f"Reminder:\n**{summary}** starts in **{hrs_left}** {hours}!"
