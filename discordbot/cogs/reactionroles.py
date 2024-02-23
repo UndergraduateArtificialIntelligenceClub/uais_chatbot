@@ -1,13 +1,9 @@
-
 import discord
 import asyncio
 from discord.ext import commands
 
-intents = discord.Intents.default()
-intents.reactions = True
 
-# Command to make role message
-class RoleCommand(commands.Cog):
+class ReactionRoles(commands.Cog):
     message_id = None
 
     def __init__(self, bot):
@@ -161,6 +157,4 @@ class RoleCommand(commands.Cog):
    
                 
 async def setup(bot):
-    await bot.add_cog(RoleCommand(bot))
-
-
+    await bot.add_cog(ReactionRoles(bot))

@@ -38,7 +38,7 @@ async def load_extensions():
     await bot.load_extension(f"cogs.admin")
     await bot.load_extension(f"cogs.faq")
     await bot.load_extension(f"cogs.auditlogs")
-    await bot.load_extension(f"cogs.roles")
+    await bot.load_extension(f"cogs.reactionroles")
     # await bot.load_extension(f"cogs.googlecalendar")
 
 
