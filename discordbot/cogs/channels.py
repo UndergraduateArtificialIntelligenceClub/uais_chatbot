@@ -31,36 +31,36 @@ class Channels(commands.Cog):
 
             await guild.create_category(name)
             await ctx.send(f"Created a category named {name}")
+            return 
         
+        if type.lower() == 'text':
+            channel_create_function = guild.create_text_channel
+            channel_type_name = 'text'
+        elif type.lower() == 'voice':
+            channel_create_function = guild.create_voice_channel
+            channel_type_name = 'voice'
         else:
-            if type.lower() == 'text':
-                channel_create_function = guild.create_text_channel
-                channel_type_name = 'text'
-            elif type.lower() == 'voice':
-                channel_create_function = guild.create_voice_channel
-                channel_type_name = 'voice'
-            else:
-                await ctx.send('Invalid channel type. Please specify "text" or "voice".')
-                return
-            
-            await ctx.send(f"Do you want this {channel_type_name} channel to be in a category? If yes, please specify the category name, otherwise type 'n'")
-            category_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
+            await ctx.send('Invalid channel type. Please specify "text" or "voice".')
+            return
+        
+        await ctx.send(f"Do you want this {channel_type_name} channel to be in a category? If yes, please specify the category name, otherwise type 'n'")
+        category_name = await self.bot.wait_for('message', check=lambda message: message.author == ctx.author, timeout=60)
 
-            if category_name.content.lower() == 'n':
-                category = None
-            else:
-                category = discord.utils.get(ctx.guild.categories, name=category_name.content)
-                if category is None:
-                    await ctx.send("Invalid category name. Please try the command again.")
-                    return
-            
-            existing_channel = discord.utils.get(category.channels if category else guild.channels, name=name)
-            if existing_channel:
-                await ctx.send(f"A {channel_type_name} channel with the name '{name}' already exists")
+        if category_name.content.lower() == 'n':
+            category = None
+        else:
+            category = discord.utils.get(ctx.guild.categories, name=category_name.content)
+            if category is None:
+                await ctx.send("Invalid category name. Please try the command again.")
                 return
+        
+        existing_channel = discord.utils.get(category.channels if category else guild.channels, name=name)
+        if existing_channel:
+            await ctx.send(f"A {channel_type_name} channel with the name '{name}' already exists")
+            return
 
-            await channel_create_function(name, category=category)
-            await ctx.send(f"Created a {channel_type_name} channel named {name}{' in the category ' + category.name if category else ''}")
+        await channel_create_function(name, category=category)
+        await ctx.send(f"Created a {channel_type_name} channel named {name}{' in the category ' + category.name if category else ''}")
 
 
     @commands.command(brief='Deletes a channel', aliases=['del'])
@@ -125,7 +125,7 @@ class Channels(commands.Cog):
                 await ctx.send(f"The role {name} does not exist.")
                 return
 
-            category_name = name + ' team'
+            category_name = name
             category = discord.utils.get(guild.categories, name=category_name)
             if category:
                 await ctx.send(f"A category with the name '{category_name}' already exists.")
@@ -162,6 +162,10 @@ class Channels(commands.Cog):
                     return
 
             category = await guild.create_category_channel(name=category_name)
+
+            await category.set_permissions(role, read_messages=True, send_messages=True)
+            await category.set_permissions(ctx.guild.default_role, read_messages=False, send_messages=False)
+
             text = await category.create_text_channel(text_channel_name)
             voice = await category.create_voice_channel(voice_channel_name)
 
