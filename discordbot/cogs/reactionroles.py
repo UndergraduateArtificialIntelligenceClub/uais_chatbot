@@ -1,51 +1,37 @@
 import discord
-import asyncio
+from asyncio import TimeoutError
 from discord.ext import commands
 
 
 class ReactionRoles(commands.Cog):
-    message_id = None
 
     def __init__(self, bot):
         self.bot = bot
         self.roles_data = []
         self.msg_id = None
 
-    @commands.command(brief='gets user to add a role assignment message', aliases=['rr', 'reactionroles'])
+    @commands.command(brief='Creates a message with reaction roles. Call with channel ID', aliases=['rr', 'reactionroles'])
     @commands.has_permissions(administrator=True)
-    async def reactionrole(self, ctx):
-        if self.roles_data != []:
-            self.roles_data = []
-
-        # Get channel ID from admin
-        await ctx.send("Copy and paste the channel ID of the channel you would like to send your reaction message to.")
-   
-        try:
-            channel_id = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
-            channel_id = int(channel_id.content)
-            channel = discord.utils.get(ctx.guild.channels, id=channel_id)
-
-            if channel == None:
-                await ctx.send("Invalid channel ID. Please try again.")
-                return
-            
-        except asyncio.TimeoutError:
-            await ctx.send("Timed out. Command will exit now.")
-            return
-        
+    async def reactionrole(self, ctx, channel_id: int):
         channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            await ctx.send("Could not get channel with provided channel ID. Provide channel ID where to send the reaction message.")
+            return
+
+        if self.roles_data:
+            self.roles_data = []
 
         # Get role reaction message content from admin
         while True:
             try:
                 await ctx.send("Insert the role message you would like to send.")
-                msg_input = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=30)
+                msg_input = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=120)
                 msg_input = msg_input.content
 
                 # Give preview for admin to continue or redo message
                 await ctx.send(f"Preview: \n\n{msg_input}\n\nType 'r' to redo message, 'c' to continue.")
 
-                check = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=30)
+                check = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=120)
                 check = check.content.lower()
 
                 if check == "r":
@@ -56,8 +42,8 @@ class ReactionRoles(commands.Cog):
                 else:
                     await ctx.send("Invalid input. Please try again.\n")
 
-            except asyncio.TimeoutError:
-                await ctx.send("Timed out. Please try again.")
+            except TimeoutError:
+                await ctx.send("Timed out, please try again.")
                 return
 
         # Get role emoji and role names from admin
@@ -66,7 +52,7 @@ class ReactionRoles(commands.Cog):
         while True:
             try:
                 await ctx.send("Input your emoji and role name, or type 'done' if done.")
-                user_input = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
+                user_input = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=120)
                 user_input = user_input.content
 
                 if user_input.lower() == "done":
@@ -82,11 +68,13 @@ class ReactionRoles(commands.Cog):
                     if emoji == None:
                         await ctx.send("Invalid emoji. Please try again.")
                     else:
-                        role = discord.utils.get(ctx.guild.roles, name=role_name)
+                        role = discord.utils.get(
+                            ctx.guild.roles, name=role_name)
                         if not role:
                             role = await ctx.guild.create_role(name=role_name)
-                        
-                        original_roles_data = self.roles_data.copy() # Roles without new one in case user wants to redo
+
+                        # Roles without new one in case user wants to redo
+                        original_roles_data = self.roles_data.copy()
 
                         self.roles_data.append({
                             "emoji": emoji,
@@ -96,7 +84,7 @@ class ReactionRoles(commands.Cog):
                         # Give preview for admin to continue or redo message
                         while True:
                             await ctx.send(f"Preview:\n{emoji} = {role_name}\nType 'r' to redo, 'c' to continue.")
-                            undo = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=60)
+                            undo = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=120)
                             undo = undo.content.lower()
                             if undo == "r":
                                 await ctx.send("Redoing...\n")
@@ -108,7 +96,7 @@ class ReactionRoles(commands.Cog):
                             else:
                                 await ctx.send("Invalid input. Please try again.\n")
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await ctx.send("Timed out. Please try again.")
                 return
 
@@ -123,14 +111,15 @@ class ReactionRoles(commands.Cog):
         for role_data in self.roles_data:
             await message.add_reaction(role_data["emoji"])
 
-        self.bot.reaction_roles.setdefault(ctx.guild.id, []).extend([{"message_id": message.id, **role_data} for role_data in self.roles_data])
-    
-    #Add role upon user reaction
+        self.bot.reaction_roles.setdefault(ctx.guild.id, []).extend(
+            [{"message_id": message.id, **role_data} for role_data in self.roles_data])
+
+    # Add role upon user reaction
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         if payload.user_id == self.bot.user.id:
             return
-        
+
         guild = self.bot.get_guild(payload.guild_id)
 
         for roles in self.roles_data:
@@ -138,14 +127,13 @@ class ReactionRoles(commands.Cog):
                 role_assign = roles["role_name"]
                 role = discord.utils.get(guild.roles, name=role_assign)
                 await payload.member.add_roles(role, atomic=True)
-                    
 
-    #Remove role upon user reaction
+    # Remove role upon user removing reaction
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
         if payload.user_id == self.bot.user.id:
             return
-        
+
         guild = self.bot.get_guild(payload.guild_id)
 
         for roles in self.roles_data:
@@ -153,8 +141,8 @@ class ReactionRoles(commands.Cog):
                 role_assign = roles["role_name"]
                 role = discord.utils.get(guild.roles, name=role_assign)
                 member = await guild.fetch_member(payload.user_id)
-                await member.remove_roles(role, atomic=True) 
-   
-                
+                await member.remove_roles(role, atomic=True)
+
+
 async def setup(bot):
     await bot.add_cog(ReactionRoles(bot))
