@@ -24,6 +24,7 @@ PREFIX = os.environ['COMMAND_PREFIX']
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
@@ -39,6 +40,8 @@ async def load_extensions():
     await bot.load_extension(f"cogs.faq")
     await bot.load_extension(f"cogs.auditlogs")
     # await bot.load_extension(f"cogs.googlecalendar")
+    await bot.load_extension(f"cogs.channels")
+    await bot.load_extension(f"cogs.names")
 
 
 async def main():
