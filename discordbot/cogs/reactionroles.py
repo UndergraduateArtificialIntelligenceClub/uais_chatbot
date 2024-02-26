@@ -1,4 +1,5 @@
 import discord
+import json
 from asyncio import TimeoutError
 from discord.ext import commands
 
@@ -9,10 +10,30 @@ class ReactionRoles(commands.Cog):
         self.bot = bot
         self.roles_data = []
         self.msg_id = None
+        self.settings_file = 'reactionroles.json'
+        self.load_settings()
+
+    def load_settings(self):
+        try:
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                self.msg_id = settings.get('msg_id')
+                roles_data_json = settings.get('roles_data')
+                self.roles_data = json.loads(roles_data_json)
+        except FileNotFoundError:
+            self.save_settings()
+
+    def save_settings(self):
+        settings = {
+            'msg_id': self.msg_id,
+            'roles_data': json.dumps(self.roles_data)
+        }
+        with open(self.settings_file, 'w') as f:
+            json.dump(settings, f, indent=4)
 
     @commands.command(brief='Creates a message with reaction roles. Call with channel ID', aliases=['rr', 'reactionroles'])
     @commands.has_permissions(administrator=True)
-    async def reactionrole(self, ctx, channel_id: int):
+    async def reactionrole(self, ctx, channel_id:int=None):
         channel = self.bot.get_channel(channel_id)
         if channel is None:
             await ctx.send("Could not get channel with provided channel ID. Provide channel ID where to send the reaction message.")
@@ -108,11 +129,13 @@ class ReactionRoles(commands.Cog):
         message = await channel.send(message_content)
         self.msg_id = message.id
 
+        self.save_settings()
+
         for role_data in self.roles_data:
             await message.add_reaction(role_data["emoji"])
 
-        self.bot.reaction_roles.setdefault(ctx.guild.id, []).extend(
-            [{"message_id": message.id, **role_data} for role_data in self.roles_data])
+        # What is this?
+        # self.bot.reaction_roles.setdefault(ctx.guild.id, []).extend([{"message_id": message.id, **role_data} for role_data in self.roles_data])
 
     # Add role upon user reaction
     @commands.Cog.listener()
