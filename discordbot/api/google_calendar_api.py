@@ -1,11 +1,12 @@
+import json
 import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from datetime import datetime
-from dotenv import load_dotenv
 
 load_dotenv()
 TIMEZONE = os.environ['TIMEZONE']
@@ -14,6 +15,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 class GoogleCalendarAPI:
+
     def __init__(self):
         self.service = self.initialize_service()
 
@@ -44,64 +46,63 @@ class GoogleCalendarAPI:
             print(f"Google calendar initialization failed: {error}")
             return None
 
-    def list_events(self, max_results=10):
+    def get_events(self, max_results=10, custom_reminders=False):
         try:
-            # Call the Calendar API
             now = datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
+            query_params = {
+                "calendarId": "primary",
+                "timeMin": now,
+                "singleEvents": True,
+                "orderBy": "startTime",
+            }
 
-            # Getting the upcoming max_results events
-            events_result = (
-                self.service.events()
-                .list(
-                    calendarId="primary",
-                    timeMin=now,
-                    maxResults=max_results,
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            )
+            if max_results is not None:
+                query_params["maxResults"] = max_results
+
+            if custom_reminders is True:
+                # Currently, the earliest custom reminder for an event is 1 week
+                # So when googlecalendar.py calls this to find events that need a reminder scheduled
+                # We do not care about anything past that point
+                one_week_from_now = datetime.utcnow() + timedelta(weeks=1, hours=1)
+                one_week_from_now_iso = one_week_from_now.isoformat() + "Z"
+                query_params["timeMax"] = one_week_from_now_iso
+
+                custom_reminders_val = "true" if custom_reminders else "false"
+                query_params["privateExtendedProperty"] = f"custom={custom_reminders_val}"
+
+            events_result = self.service.events().list(**query_params).execute()
             events = events_result.get("items", [])
 
-            if not events:
-                return "No upcoming events found."
-
-            # Sends the start and name of the next events_num events
-            payload = ""
-            for event in events:
-                # Get event start time
-                start = event["start"].get(
-                    "dateTime", event["start"].get("date"))
-                # Convert to human readable format
-                start_dt = datetime.fromisoformat(start)
-                formatted_start = start_dt.strftime(
-                    "%B %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
-
-                payload += f"**{formatted_start}:** {event['summary']}\n"
-
-            return payload
+            return events
 
         except HttpError as error:
-            return f"An error occured: {error}"
+            return f"An error occurred: {error}"
 
-    def create_event(self, event_data):
-        # Summary,Location,Description,Start time,End time
-        # Test event,University of Alberta,Description,2023-12-20T09:00:00,2023-12-21T17:00:00
+    def create_event(self, summary, location, description, start_time: datetime, end_time: datetime, roles: list = None, mins_before_reminder: list = None):
+        # Example arguments:
+        # Test event, University of Alberta, Description, datetime start time, datetime end time, ["role1"], [120, 60, 30, 5]
 
-        arguments = event_data.split(',')
-        if len(arguments) != 5:
-            return None
+        if not summary or not start_time or not end_time:
+            return "Error: Cannot create event without summary, start_time or end_time"
+
+        # Convert additional data to json
+        roles_json = json.dumps(roles) if roles is not None else ''
+        minutes_list_json = json.dumps(mins_before_reminder) if mins_before_reminder is not None else ''
+        is_custom = "true" if mins_before_reminder is not None else 'false'
+
+        # mins_before_reminder is a list of integers which represent minutes
+        # mins_before_reminder = [60, 30, 15] means: remind about this event 60 minutes before it happens, 30, 15 minutes.
 
         event = {
-            'summary': arguments[0],
-            'location': arguments[1],
-            'description': arguments[2],
+            'summary': summary,
+            'location': location,
+            'description': description,
             'start': {
-                'dateTime': arguments[3],
+                'dateTime': start_time.isoformat(),
                 'timeZone': TIMEZONE,
             },
             'end': {
-                'dateTime': arguments[4],
+                'dateTime': end_time.isoformat(),
                 'timeZone': TIMEZONE,
             },
             'reminders': {
@@ -111,6 +112,13 @@ class GoogleCalendarAPI:
                     {'method': 'popup', 'minutes': 10},
                 ],
             },
+            'extendedProperties': {
+                'private': {
+                    'roles': roles_json,  # Roles to remind
+                    'reminderMinutes': minutes_list_json,
+                    'custom': is_custom
+                }
+            }
         }
 
         try:
