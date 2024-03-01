@@ -8,6 +8,9 @@ credentials.json
 token.json
 reminderchannel.json
 
+# Reaction roles stuff
+reactionroles.json
+
 # Logs
 bot_logs.txt
 
