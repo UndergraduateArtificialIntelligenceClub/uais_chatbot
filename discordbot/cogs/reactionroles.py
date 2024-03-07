@@ -1,6 +1,6 @@
 import discord
 import json
-#import emoji
+import emoji
 from asyncio import TimeoutError
 from discord.ext import commands
 
@@ -83,15 +83,11 @@ class ReactionRoles(commands.Cog):
                     await ctx.send("Invalid input. Be sure to include a '-' in your input. Please try again.")
                 else:
                     # Split input into emoji and role name
-                    emoji, role_name = user_input.split('-', 1)
-                    emoji = emoji.strip()
-                    emo = discord.utils.get(ctx.guild.emojis, name=emoji)
-                    emo_id = emo.id
-                    await ctx.send(emoji)
-                    await ctx.send(emo_id)
+                    emoji_str, role_name = user_input.split('-', 1)
+                    emoji_str = emoji_str.strip()
                     role_name = role_name.strip()
 
-                    if emoji == None:
+                    if not emoji.emoji_count(emoji_str): # check if valid emoji
                         await ctx.send("Invalid emoji. Please try again.")
                     else:
                         role = discord.utils.get(
@@ -103,13 +99,13 @@ class ReactionRoles(commands.Cog):
                         original_roles_data = self.roles_data.copy()
 
                         self.roles_data.append({
-                            "emoji": emoji,
+                            "emoji": emoji_str,
                             "role_name": role_name
                         })
 
                         # Give preview for admin to continue or redo message
                         while True:
-                            await ctx.send(f"Preview:\n{emoji} = {role_name}\nType 'r' to redo, 'c' to continue.")
+                            await ctx.send(f"Preview:\n{emoji_str} = {role_name}\nType 'r' to redo, 'c' to continue.")
                             undo = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=120)
                             undo = undo.content.lower()
                             if undo == "r":
