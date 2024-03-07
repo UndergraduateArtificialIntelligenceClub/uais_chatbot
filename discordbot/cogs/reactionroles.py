@@ -1,5 +1,6 @@
 import discord
 import json
+#import emoji
 from asyncio import TimeoutError
 from discord.ext import commands
 
@@ -84,6 +85,10 @@ class ReactionRoles(commands.Cog):
                     # Split input into emoji and role name
                     emoji, role_name = user_input.split('-', 1)
                     emoji = emoji.strip()
+                    emo = discord.utils.get(ctx.guild.emojis, name=emoji)
+                    emo_id = emo.id
+                    await ctx.send(emoji)
+                    await ctx.send(emo_id)
                     role_name = role_name.strip()
 
                     if emoji == None:
@@ -133,10 +138,7 @@ class ReactionRoles(commands.Cog):
 
         for role_data in self.roles_data:
             await message.add_reaction(role_data["emoji"])
-
-        # What is this?
-        # self.bot.reaction_roles.setdefault(ctx.guild.id, []).extend([{"message_id": message.id, **role_data} for role_data in self.roles_data])
-
+            
     # Add role upon user reaction
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
