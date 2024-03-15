@@ -1,7 +1,7 @@
 import os
 import asyncio
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from dotenv import load_dotenv
 import logging
 
@@ -12,10 +12,10 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 log_file_path = os.path.join(base_dir, 'bot_logs.txt')
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG,  # Set log level to DEBUG
+logging.basicConfig(level=logging.ERROR,
                     format='%(asctime)s:%(levelname)s:%(name)s: %(message)s\n',
-                    filename=log_file_path,  # Save logs to bot_logs.txt in the current directory
-                    filemode='a')  # Append to the log file
+                    filename=log_file_path,
+                    filemode='a')
 
 load_dotenv()
 
@@ -34,13 +34,12 @@ async def on_ready():
     print(f'Logged in as {bot.user}')
 
 
-# Comment out cogs you do not need during development
 async def load_extensions():
     await bot.load_extension(f"cogs.admin")
     await bot.load_extension(f"cogs.faq")
     await bot.load_extension(f"cogs.auditlogs")
     await bot.load_extension(f"cogs.reactionroles")
-    # await bot.load_extension(f"cogs.googlecalendar")
+    await bot.load_extension(f"cogs.googlecalendar")
     await bot.load_extension(f"cogs.channels")
     await bot.load_extension(f"cogs.names")
 
