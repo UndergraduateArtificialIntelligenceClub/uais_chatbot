@@ -14,8 +14,8 @@ jobs:
 
     - name: Decode SSH Key
       run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY_BASE64 }}" | base64 -d > discordbot.pem
-        chmod 600 discordbot.pem
+        echo "${{ secrets.SSH_PRIVATE_KEY_BASE64 }}" | base64 -d > ${{ runner.temp }}/discordbot.pem
+        chmod 600 ${{ runner.temp }}/discordbot.pem
 
     - name: Deploy to Server
       uses: appleboy/ssh-action@v0.1.4  # Using a specific version for better stability
