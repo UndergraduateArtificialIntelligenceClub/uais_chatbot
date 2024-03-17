@@ -10,19 +10,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3  # Updated to use the latest version of the checkout action
-
-    - name: Decode SSH Key
-      run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY_BASE64 }}" | base64 -d > ${{ runner.temp }}/discordbot.pem
-        chmod 600 ${{ runner.temp }}/discordbot.pem
+      uses: actions/checkout@v2
 
     - name: Deploy to Server
-      uses: appleboy/ssh-action@v0.1.4  # Using a specific version for better stability
+      uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_IP }}
         username: ${{ secrets.SERVER_USER }}
-        key: ${{ runner.temp }}/discordbot.pem
-        script: |
-          /home/ubuntu/update_bot.sh
-  
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: /home/ubuntu/update_bot.sh
