@@ -42,6 +42,7 @@ async def load_extensions():
     await bot.load_extension(f"cogs.googlecalendar")
     await bot.load_extension(f"cogs.channels")
     await bot.load_extension(f"cogs.names")
+await bot.load_extension(f"cogs.uai")
 
 
 async def main():
