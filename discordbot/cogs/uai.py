@@ -2,7 +2,7 @@ from discord.ext import commands
 import g4f
 import asyncio
 
-class uai(commands.Cog):
+class Uai(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
@@ -47,4 +47,4 @@ class uai(commands.Cog):
         #return
     
 async def setup(bot):
-  await bot.add_cog(AI(bot))
+  await bot.add_cog(Uai(bot))
