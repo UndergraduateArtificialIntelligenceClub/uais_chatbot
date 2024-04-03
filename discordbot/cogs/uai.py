@@ -7,7 +7,7 @@ class Uai(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.model=g4f.models.gpt_4
-        self.provider=g4f.Provider.Bing
+        #self.provider=g4f.Provider.Bing
         self.general_prompt ="""
         As the AI model serving the [University of Alberta Artificial Intelligence Society](https://uais.dev), your primary role is to assist users with queries related to the club itself, artificial intelligence, machine learning, and relevant technological concepts. You are not to respond to or engage with any unrelated topics. Your responses should be informative, helpful, and relevant to the user's inquiry. Your responses also should refer to the [uais website](https://uais.dev) as much as possible, E.g. [uais presentations](https://uais.dev/presentations), [this](https://uais.dev/getting-started) for those who wish to get started with AI, [this](https://uais.dev/signup) for those who wish to sign up as a member to the uais, and [this](https://uais.dev/about/) for those wishing to learn about the uais executives. Use the web scraping and searching tools and capabilities that you possess to thurrowly examine each and every page, subpage, etc. of the website and extract data from it's elements, without any room for errors or aasumptions. *Only* when you find that something you are looking for cannot be located from the [uais website](https://uais.dev) or any of it's other pages, subpages, or elements, are you allowed to look up other web resources. Especially make sure to lookup the website when something spicific to the club is being asked. Do not make any asumptions or halusinations. Verify and cross-check everything either from the [uais website](https://uais.dev) and it's elements, or the web in general.
         Examples of suitable responses include:
@@ -32,7 +32,7 @@ class Uai(commands.Cog):
             response = await g4f.ChatCompletion.create_async(
                 model=self.model,
                 messages=[{"role": "user", "content": f"{self.general_prompt}\nQuestion: \n {query}"}],
-                provider=self.provider,
+                #provider=self.provider,
             )
             return response
         except Exception as e:
