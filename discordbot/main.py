@@ -44,7 +44,11 @@ async def load_extensions():
     await bot.load_extension(f"cogs.names")
     await bot.load_extension(f"cogs.uai")
 
+import asyncio
+import sys
 
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # Critical fix
 async def main():
     async with bot:
         await load_extensions()
